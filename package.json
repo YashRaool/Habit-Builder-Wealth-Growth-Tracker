@@ -1,0 +1,13 @@
+{
+  "name": "financial-habit-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "install:all": "cmd /c \"cd server && npm install && cd ../client && npm install\"",
+    "dev:server": "cmd /c \"cd server && npm run dev\"",
+    "dev:client": "cmd /c \"cd client && npm run dev\"",
+    "build": "cmd /c \"cd client && npm run build\"",
+    "start": "cmd /c \"cd server && npm start\"",
+    "seed": "cmd /c \"cd server && npm run seed\""
+  }
+}
