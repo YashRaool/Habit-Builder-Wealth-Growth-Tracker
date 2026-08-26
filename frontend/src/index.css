@@ -1,0 +1,153 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap');
+@import "tailwindcss";
+
+/* ─── Tailwind v4 theme tokens ─── */
+@theme {
+  --color-canvas:        #F1EFEA;
+  --color-canvas-dark:   #111318;
+  --color-surface:       #FFFFFF;
+  --color-surface-dark:  #1C1F27;
+  --color-coral:         #F2793D;
+  --color-coral-light:   #F9956A;
+  --color-coral-dark:    #C95E27;
+  --color-ink:           #16181D;
+  --color-ink-dark:      #EDECEA;
+  --color-mint:          #2FA86C;
+  --color-mint-light:    #5DC490;
+  --color-rose:          #E2574C;
+  --color-rose-light:    #EA8078;
+  --color-muted:         #9CA3AF;
+  --color-muted-dark:    #6B7280;
+  --color-border:        #E8E5DF;
+  --color-border-dark:   #2A2E38;
+
+  --font-family-sans:    'Plus Jakarta Sans', system-ui, sans-serif;
+
+  --border-radius-card:  18px;
+  --border-radius-pill:  9999px;
+
+  --shadow-card:     0 2px 16px 0 rgba(22,24,29,0.07);
+  --shadow-card-md:  0 4px 24px 0 rgba(22,24,29,0.10);
+  --shadow-nav:      0 2px 12px 0 rgba(22,24,29,0.08);
+
+  --animate-fade-in: fade-in 0.25s ease-out both;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── CSS custom properties (single source of truth) ─── */
+:root {
+  --canvas:  #F1EFEA;
+  --surface: #FFFFFF;
+  --coral:   #F2793D;
+  --ink:     #16181D;
+  --mint:    #2FA86C;
+  --rose:    #E2574C;
+  --muted:   #9CA3AF;
+  --border:  #E8E5DF;
+  --shadow-card: 0 2px 16px 0 rgba(22,24,29,0.07);
+}
+
+.dark {
+  --canvas:  #111318;
+  --surface: #1C1F27;
+  --ink:     #EDECEA;
+  --border:  #2A2E38;
+  --muted:   #6B7280;
+  --shadow-card: 0 2px 16px 0 rgba(0,0,0,0.35);
+}
+
+/* ─── Base layer ─── */
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html { -webkit-font-smoothing: antialiased; }
+
+  body {
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    color: var(--ink);
+    background-color: var(--canvas);
+    min-height: 100dvh;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  /* Visible keyboard focus ring */
+  :focus-visible {
+    outline: 2px solid var(--coral);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+
+  /* Respect reduced-motion */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* ─── Typography utilities ─── */
+@layer utilities {
+  .text-hero  { font-size: 3.5rem;    line-height: 1.1; font-weight: 800; }
+  .text-stat  { font-size: 2rem;      line-height: 1.2; font-weight: 700; }
+  .text-label {
+    font-size: 0.6875rem;
+    line-height: 1.4;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* Card shell — every stat card inherits this */
+  .card {
+    background-color: var(--surface);
+    border-radius: 18px;
+    box-shadow: var(--shadow-card);
+    padding: 1.25rem 1.5rem;
+    transition: box-shadow 0.18s ease;
+  }
+  .card:hover { box-shadow: 0 4px 24px 0 rgba(22,24,29,0.10); }
+
+  /* Delta badges */
+  .badge-mint {
+    font-size: 0.75rem; font-weight: 600;
+    color: var(--mint); background: rgba(47,168,108,0.1);
+    border-radius: 9999px; padding: 0.125rem 0.5rem;
+  }
+  .badge-rose {
+    font-size: 0.75rem; font-weight: 600;
+    color: var(--rose); background: rgba(226,87,76,0.1);
+    border-radius: 9999px; padding: 0.125rem 0.5rem;
+  }
+  .badge-muted {
+    font-size: 0.75rem; font-weight: 600;
+    color: var(--muted); background: rgba(156,163,175,0.1);
+    border-radius: 9999px; padding: 0.125rem 0.5rem;
+  }
+
+  /* Pill nav item */
+  .nav-pill {
+    border-radius: 9999px; padding: 0.5rem 1rem;
+    font-size: 0.875rem; font-weight: 600;
+    transition: background 0.2s, color 0.2s;
+    color: var(--muted);
+  }
+  .nav-pill:hover { color: var(--ink); background: var(--border); }
+  .nav-pill.active { background: var(--ink); color: #FFFFFF; }
+  .dark .nav-pill.active { background: var(--coral); color: #FFFFFF; }
+
+  /* Glass nav strip */
+  .glass-strip {
+    background: rgba(241,239,234,0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+  .dark .glass-strip {
+    background: rgba(17,19,24,0.85);
+  }
+}
