@@ -20,7 +20,7 @@ function Protected({ children, adminOnly = false }) {
 export default function App() {
   return (
     <ThemeProvider>
-      <BrowserRouter>
+      <BrowserRouter basename={import.meta.env.BASE_URL}>
         <AuthProvider>
           <div
             className="min-h-dvh"

@@ -1,14 +1,19 @@
-import { PGlite } from '@electric-sql/pglite';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import pg from 'pg';
+import dotenv from 'dotenv';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config();
 
-const db = new PGlite('./pglite-data');
+const { Pool } = pg;
 
-// Initialize schema on startup
-const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
-await db.exec(schema);
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.NODE_ENV === 'production'
+        ? { rejectUnauthorized: false }
+        : false,
+});
 
-export default db;
+pool.on('error', (err) => {
+    console.error('Unexpected PostgreSQL pool error:', err);
+});
+
+export default pool;
