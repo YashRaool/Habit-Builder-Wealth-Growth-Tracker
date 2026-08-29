@@ -36,7 +36,7 @@ jobs:
         working-directory: ./frontend
         env:
           VITE_API_URL: https://wealthhabit-backend.onrender.com/api
-        run: npm run build
+        run: npm run build && cp dist/index.html dist/404.html
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
