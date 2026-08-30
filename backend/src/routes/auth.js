@@ -66,7 +66,13 @@ router.post('/login', async (req, res) => {
     );
 
     const user = rows[0];
-    const valid = user && (await bcrypt.compare(password, user.password_hash));
+
+    // Explicitly validate that user and password_hash exist before comparison
+    if (!user || !user.password_hash) {
+      return res.status(401).json({ errors: ['Invalid email or password'] });
+    }
+
+    const valid = await bcrypt.compare(password, user.password_hash);
 
     if (!valid) {
       return res.status(401).json({ errors: ['Invalid email or password'] });

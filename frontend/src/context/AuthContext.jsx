@@ -20,6 +20,7 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async (email, password) => {
     const { token, user } = await api.post('/auth/login', { email, password });
+    if (!token || !user) throw { errors: ['Invalid authentication response'] };
     localStorage.setItem('wh-token', token);
     setUser(user);
     return user;
@@ -27,6 +28,7 @@ export function AuthProvider({ children }) {
 
   const register = useCallback(async (name, email, password) => {
     const { token, user } = await api.post('/auth/register', { name, email, password });
+    if (!token || !user) throw { errors: ['Invalid authentication response'] };
     localStorage.setItem('wh-token', token);
     setUser(user);
     return user;
