@@ -5,7 +5,13 @@ import StreakGauge from '@/components/StreakGauge';
 import HabitHeatmap from '@/components/HabitHeatmap';
 
 const FREQ_LABEL = { daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly' };
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
 
 /* ─── Add/Edit modal ─── */
 function HabitModal({ habit, onSave, onClose }) {

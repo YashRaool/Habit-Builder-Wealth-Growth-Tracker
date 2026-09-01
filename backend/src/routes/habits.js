@@ -98,14 +98,52 @@ router.post('/:id/checkin', async (req, res) => {
     [habitId]
   );
 
+  const getWeekStr = (d) => {
+    const date = new Date(d.getTime());
+    date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay()||7));
+    const yearStart = new Date(Date.UTC(date.getUTCFullYear(),0,1));
+    const weekNo = Math.ceil(( ( (date - yearStart) / 86400000) + 1)/7);
+    return `${date.getUTCFullYear()}-W${weekNo}`;
+  };
+  const getMonthStr = (d) => `${d.getUTCFullYear()}-${d.getUTCMonth()}`;
+
   let streak = 0;
-  let d = new Date(today);
-  for (const l of logs) {
-    if (l.date.toISOString().slice(0,10) === d.toISOString().slice(0,10) && l.completed) {
-      streak++;
-      d.setDate(d.getDate() - 1);
-    } else if (l.date.toISOString().slice(0,10) < d.toISOString().slice(0,10)) {
-      break;
+  if (habit.frequency === 'daily') {
+    let d = new Date(today);
+    for (const l of logs) {
+      if (l.date.toISOString().slice(0,10) === d.toISOString().slice(0,10) && l.completed) {
+        streak++;
+        d.setDate(d.getDate() - 1);
+      } else if (l.date.toISOString().slice(0,10) < d.toISOString().slice(0,10)) {
+        break;
+      }
+    }
+  } else {
+    let currentPeriod = habit.frequency === 'weekly' ? getWeekStr(new Date(today)) : getMonthStr(new Date(today));
+    let d = new Date(today);
+    
+    const periods = [];
+    for (const l of logs) {
+      if (!l.completed) continue;
+      const p = habit.frequency === 'weekly' ? getWeekStr(l.date) : getMonthStr(l.date);
+      if (periods.length === 0 || periods[periods.length - 1] !== p) {
+        periods.push(p);
+      }
+    }
+    
+    for (const p of periods) {
+      if (p === currentPeriod) {
+        streak++;
+        if (habit.frequency === 'weekly') {
+          d.setUTCDate(d.getUTCDate() - 7);
+          currentPeriod = getWeekStr(d);
+        } else {
+          d.setUTCMonth(d.getUTCMonth() - 1);
+          currentPeriod = getMonthStr(d);
+        }
+      } else {
+        break;
+      }
     }
   }
 

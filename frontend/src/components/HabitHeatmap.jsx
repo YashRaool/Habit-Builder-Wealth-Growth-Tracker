@@ -27,7 +27,10 @@ function getGrid(logs, weeks) {
     for (let d = 0; d <= 6; d++) {
       const date = new Date(endDate);
       date.setDate(endDate.getDate() - w * 7 - (6 - d));
-      const key = date.toISOString().slice(0, 10);
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const key = `${y}-${m}-${day}`;
       const isFuture = date > today;
       col.push({ key, isFuture, completed: logMap[key] ?? null });
     }
