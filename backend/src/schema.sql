@@ -7,8 +7,10 @@ CREATE TABLE IF NOT EXISTS users (
   id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   name         TEXT        NOT NULL,
   email        TEXT        UNIQUE NOT NULL,
-  password_hash TEXT       NOT NULL,
+  password_hash TEXT,
   role         TEXT        NOT NULL DEFAULT 'user' CHECK (role IN ('user','admin')),
+  google_id    TEXT        UNIQUE,
+  auth_provider TEXT       DEFAULT 'local',
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

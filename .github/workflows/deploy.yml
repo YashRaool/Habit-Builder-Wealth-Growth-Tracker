@@ -36,6 +36,7 @@ jobs:
         working-directory: ./frontend
         env:
           VITE_API_URL: https://wealthhabit-backend.onrender.com/api
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
         run: npm run build && cp dist/index.html dist/404.html
 
       - name: Setup Pages

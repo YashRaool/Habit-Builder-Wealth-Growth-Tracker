@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '@/context/AuthContext';
 import Card from '@/components/Card';
 
@@ -33,7 +34,7 @@ function Field({ label, id, type = 'text', value, onChange, placeholder, error }
 
 /* ─── Login form ─── */
 function LoginForm({ onSuccess }) {
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
   const [errors,   setErrors]   = useState([]);
@@ -61,38 +62,65 @@ function LoginForm({ onSuccess }) {
     }
   }
 
+  const handleGoogleSuccess = async (credentialResponse) => {
+    setBusy(true); setErrors([]);
+    try {
+      await loginWithGoogle(credentialResponse.credential);
+      onSuccess();
+    } catch (err) {
+      setErrors(err.errors || ['Google Login failed']);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
-    <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
-      <Field label="Email" id="login-email" type="email" value={email}
-             onChange={setEmail} placeholder="you@example.com" />
-      <Field label="Password" id="login-password" type="password" value={password}
-             onChange={setPassword} placeholder="••••••••" />
+    <div className="flex flex-col gap-4">
+      <div className="flex justify-center">
+        <GoogleLogin
+          onSuccess={handleGoogleSuccess}
+          onError={() => setErrors(['Google Login failed'])}
+        />
+      </div>
+      
+      <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--muted)' }}>
+        <div className="flex-1 h-px bg-gray-200"></div>
+        <span>OR</span>
+        <div className="flex-1 h-px bg-gray-200"></div>
+      </div>
 
-      {errors.length > 0 && (
-        <ul className="text-xs rounded-lg p-3 flex flex-col gap-1"
-            style={{ background: 'rgba(226,87,76,0.08)', color: 'var(--rose)' }}>
-          {errors.map((e, i) => <li key={i}>• {e}</li>)}
-        </ul>
-      )}
+      <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
+        <Field label="Email" id="login-email" type="email" value={email}
+               onChange={setEmail} placeholder="you@example.com" />
+        <Field label="Password" id="login-password" type="password" value={password}
+               onChange={setPassword} placeholder="••••••••" />
 
-      <button
-        type="submit"
-        disabled={busy}
-        className="w-full py-3 rounded-xl font-semibold text-white text-sm transition-all active:scale-[.98]"
-        style={{
-          background: busy ? 'var(--muted)' : 'var(--coral)',
-          cursor: busy ? 'not-allowed' : 'pointer',
-        }}
-      >
-        {busy ? 'Signing in…' : 'Sign in'}
-      </button>
-    </form>
+        {errors.length > 0 && (
+          <ul className="text-xs rounded-lg p-3 flex flex-col gap-1"
+              style={{ background: 'rgba(226,87,76,0.08)', color: 'var(--rose)' }}>
+            {errors.map((e, i) => <li key={i}>• {e}</li>)}
+          </ul>
+        )}
+
+        <button
+          type="submit"
+          disabled={busy}
+          className="w-full py-3 rounded-xl font-semibold text-white text-sm transition-all active:scale-[.98]"
+          style={{
+            background: busy ? 'var(--muted)' : 'var(--coral)',
+            cursor: busy ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {busy ? 'Signing in…' : 'Sign in'}
+        </button>
+      </form>
+    </div>
   );
 }
 
 /* ─── Register form ─── */
 function RegisterForm({ onSuccess }) {
-  const { register } = useAuth();
+  const { register, loginWithGoogle } = useAuth();
   const [name,     setName]     = useState('');
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
@@ -122,31 +150,58 @@ function RegisterForm({ onSuccess }) {
     }
   }
 
+  const handleGoogleSuccess = async (credentialResponse) => {
+    setBusy(true); setErrors([]);
+    try {
+      await loginWithGoogle(credentialResponse.credential);
+      onSuccess();
+    } catch (err) {
+      setErrors(err.errors || ['Google Login failed']);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
-    <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
-      <Field label="Full name"  id="reg-name"     value={name}     onChange={setName}     placeholder="Alex Kim" />
-      <Field label="Email"      id="reg-email"     type="email"  value={email}    onChange={setEmail}    placeholder="you@example.com" />
-      <Field label="Password"   id="reg-password"  type="password" value={password} onChange={setPassword} placeholder="Min. 8 characters" />
+    <div className="flex flex-col gap-4">
+      <div className="flex justify-center">
+        <GoogleLogin
+          onSuccess={handleGoogleSuccess}
+          onError={() => setErrors(['Google Login failed'])}
+        />
+      </div>
+      
+      <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--muted)' }}>
+        <div className="flex-1 h-px bg-gray-200"></div>
+        <span>OR</span>
+        <div className="flex-1 h-px bg-gray-200"></div>
+      </div>
 
-      {errors.length > 0 && (
-        <ul className="text-xs rounded-lg p-3 flex flex-col gap-1"
-            style={{ background: 'rgba(226,87,76,0.08)', color: 'var(--rose)' }}>
-          {errors.map((e, i) => <li key={i}>• {e}</li>)}
-        </ul>
-      )}
+      <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
+        <Field label="Full name"  id="reg-name"     value={name}     onChange={setName}     placeholder="Alex Kim" />
+        <Field label="Email"      id="reg-email"     type="email"  value={email}    onChange={setEmail}    placeholder="you@example.com" />
+        <Field label="Password"   id="reg-password"  type="password" value={password} onChange={setPassword} placeholder="Min. 8 characters" />
 
-      <button
-        type="submit"
-        disabled={busy}
-        className="w-full py-3 rounded-xl font-semibold text-white text-sm transition-all active:scale-[.98]"
-        style={{
-          background: busy ? 'var(--muted)' : 'var(--coral)',
-          cursor: busy ? 'not-allowed' : 'pointer',
-        }}
-      >
-        {busy ? 'Creating account…' : 'Create account'}
-      </button>
-    </form>
+        {errors.length > 0 && (
+          <ul className="text-xs rounded-lg p-3 flex flex-col gap-1"
+              style={{ background: 'rgba(226,87,76,0.08)', color: 'var(--rose)' }}>
+            {errors.map((e, i) => <li key={i}>• {e}</li>)}
+          </ul>
+        )}
+
+        <button
+          type="submit"
+          disabled={busy}
+          className="w-full py-3 rounded-xl font-semibold text-white text-sm transition-all active:scale-[.98]"
+          style={{
+            background: busy ? 'var(--muted)' : 'var(--coral)',
+            cursor: busy ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {busy ? 'Creating account…' : 'Create account'}
+        </button>
+      </form>
+    </div>
   );
 }
 

@@ -34,13 +34,21 @@ export function AuthProvider({ children }) {
     return user;
   }, []);
 
+  const loginWithGoogle = useCallback(async (credential) => {
+    const { token, user: loggedInUser } = await api.post('/auth/google', { credential });
+    if (!token || !loggedInUser) throw { errors: ['Invalid authentication response'] };
+    localStorage.setItem('wh-token', token);
+    setUser(loggedInUser);
+    return loggedInUser;
+  }, []);
+
   const logout = useCallback(() => {
     localStorage.removeItem('wh-token');
     setUser(null);
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, loginWithGoogle, logout }}>
       {children}
     </AuthContext.Provider>
   );
