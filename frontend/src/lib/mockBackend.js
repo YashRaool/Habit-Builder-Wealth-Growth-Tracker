@@ -240,13 +240,18 @@ window.fetch = async function(input, init) {
 
   // --- Analytics ---
   if (route === '/analytics/net-worth-history' && method === 'GET') {
+    const getPastMonthStr = (monthsAgo) => {
+      const d = new Date();
+      d.setMonth(d.getMonth() - monthsAgo);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    };
     return response([
-      { month: 'Jan', net_worth: 1000 },
-      { month: 'Feb', net_worth: 1500 },
-      { month: 'Mar', net_worth: 2200 },
-      { month: 'Apr', net_worth: 3000 },
-      { month: 'May', net_worth: 3800 },
-      { month: 'Jun', net_worth: 4500 }
+      { month: getPastMonthStr(5), income: 4000, expenses: 3000, net_worth: 1000 },
+      { month: getPastMonthStr(4), income: 4200, expenses: 3700, net_worth: 1500 },
+      { month: getPastMonthStr(3), income: 4000, expenses: 3300, net_worth: 2200 },
+      { month: getPastMonthStr(2), income: 5000, expenses: 4200, net_worth: 3000 },
+      { month: getPastMonthStr(1), income: 4500, expenses: 3700, net_worth: 3800 },
+      { month: getPastMonthStr(0), income: 5000, expenses: 4300, net_worth: 4500 }
     ]);
   }
   if (route === '/analytics/breakdown' && method === 'GET') {
@@ -258,12 +263,28 @@ window.fetch = async function(input, init) {
     }, {});
     const investmentRows = Object.entries(investByType).map(([type, total]) => ({ type, total }));
 
+    const getPastMonthStr = (monthsAgo) => {
+      const d = new Date();
+      d.setMonth(d.getMonth() - monthsAgo);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    };
+    const currentMonthStr = getPastMonthStr(0);
+
     return response({
-      savingsRate: [{ month: 'Current', rate: 25, income: 5000, expenses: 3750 }],
+      savingsRate: [
+        { month: getPastMonthStr(5), rate: 25.0, income: 4000, expenses: 3000 },
+        { month: getPastMonthStr(4), rate: 11.9, income: 4200, expenses: 3700 },
+        { month: getPastMonthStr(3), rate: 17.5, income: 4000, expenses: 3300 },
+        { month: getPastMonthStr(2), rate: 16.0, income: 5000, expenses: 4200 },
+        { month: getPastMonthStr(1), rate: 17.8, income: 4500, expenses: 3700 },
+        { month: currentMonthStr, rate: 14.0, income: 5000, expenses: 4300 }
+      ],
       investments: investmentRows,
-      expensesByCategory: Object.entries(store.expenses.reduce((acc, curr) => {
-        acc[curr.category] = (acc[curr.category] || 0) + Number(curr.amount);
-        return acc;
+      expensesByCategory: Object.entries(store.expenses
+        .filter(e => e.date && e.date.startsWith(currentMonthStr))
+        .reduce((acc, curr) => {
+          acc[curr.category] = (acc[curr.category] || 0) + Number(curr.amount);
+          return acc;
       }, {})).map(([category, total]) => ({ category, total }))
     });
   }

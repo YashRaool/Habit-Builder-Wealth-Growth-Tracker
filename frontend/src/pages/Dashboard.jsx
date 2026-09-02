@@ -5,7 +5,10 @@ import Card from '@/components/Card';
 import StreakGauge from '@/components/StreakGauge';
 
 const fmt = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n ?? 0);
-const todayStr = () => new Date().toISOString().slice(0, 10);
+const todayStr = () => {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+};
 const curMonthStr = () => {
   const n = new Date();
   return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`;
@@ -455,8 +458,8 @@ export default function Dashboard() {
   );
 
   const currentNetCashflow = currentMonthIncome - currentMonthExpenses;
-  const savingsRate = currentMonthIncome > 0 ? Math.max(0, Math.round((currentNetCashflow / currentMonthIncome) * 100)) : 0;
-  const expenseRatio = currentMonthIncome > 0 ? Math.min(100, Math.round((currentMonthExpenses / currentMonthIncome) * 100)) : 0;
+  const savingsRate = currentMonthIncome > 0 ? Number(((currentNetCashflow / currentMonthIncome) * 100).toFixed(1)) : 0;
+  const expenseRatio = currentMonthIncome > 0 ? Number(((currentMonthExpenses / currentMonthIncome) * 100).toFixed(1)) : 0;
 
   /* ── Habit Check-in Action ── */
   async function toggleHabitCheckin(habitId) {

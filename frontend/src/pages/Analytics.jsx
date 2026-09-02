@@ -197,9 +197,9 @@ export default function Analytics() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   /* ─── Derived stats ─── */
-  const latestNW   = history.length > 0 ? history[history.length - 1].net_worth : 0;
-  const prevNW     = history.length > 1 ? history[history.length - 2].net_worth : null;
-  const nwDelta    = (prevNW !== null && Number(prevNW) !== 0) ? (((latestNW - prevNW) / Math.abs(prevNW)) * 100).toFixed(1) : null;
+  const latestNW   = history.length > 0 ? Number(history[history.length - 1].net_worth) : 0;
+  const prevNW     = history.length > 1 ? Number(history[history.length - 2].net_worth) : null;
+  const nwDelta    = (prevNW !== null && prevNW !== 0) ? (((latestNW - prevNW) / Math.abs(prevNW)) * 100).toFixed(1) : null;
 
   const latestRate = breakdown?.savingsRate?.length
     ? Number(breakdown.savingsRate[breakdown.savingsRate.length - 1].rate)
@@ -233,6 +233,7 @@ export default function Analytics() {
       rate: Number(r.rate),
       income: Number(r.income),
       expenses: Number(r.expenses),
+      target: 20,
     })),
     [breakdown]
   );
@@ -451,7 +452,7 @@ export default function Analytics() {
                        stroke={MUTED} tickLine={false} axisLine={false} width={45} />
                 <Tooltip content={<ChartTooltip formatter={v => `${v}%`} />} />
                 {/* 20% target line */}
-                <Line type="monotone" dataKey={() => 20} name="Target (20%)"
+                <Line type="monotone" dataKey="target" name="Target (20%)"
                       stroke={MUTED} strokeDasharray="6 4" strokeWidth={1.5} dot={false} />
                 <Line type="monotone" dataKey="rate" name="Savings Rate"
                       stroke={MINT} strokeWidth={2.5} dot={{ r: 4, fill: MINT }}
