@@ -19,6 +19,12 @@ const PIE_COLORS = [CORAL, MINT, '#6366f1', '#f59e0b', '#3b82f6', '#ec4899', '#1
 const TYPE_COLORS = { cash: MINT, investment: CORAL, asset: '#6366f1' };
 const TYPE_LABELS = { cash: 'Cash', investment: 'Investments', asset: 'Assets' };
 
+const INVESTMENT_TYPES = [
+  { value: 'cash',       label: 'Cash / Savings' },
+  { value: 'investment', label: 'Stocks / Funds' },
+  { value: 'asset',      label: 'Real Estate / Assets' },
+];
+
 const fmt  = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n ?? 0);
 const fmtK = (n) => n >= 1000 ? `$${(n/1000).toFixed(1)}k` : `$${n}`;
 const monthLabel = (m) => {
@@ -44,11 +50,136 @@ function ChartTooltip({ active, payload, label, formatter }) {
   );
 }
 
+/* ─── Generic Modal Container ─── */
+function Modal({ open, onClose, children }) {
+  useEffect(() => {
+    if (!open) return;
+    const esc = (e) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, [open, onClose]);
+
+  if (!open) return null;
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+      style={{ background: 'rgba(22,24,29,0.5)', backdropFilter: 'blur(4px)' }}
+      onClick={onClose}
+    >
+      <div className="w-full max-w-md animate-fade-in" onClick={(e) => e.stopPropagation()}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Add Investment Modal ─── */
+function AddInvestmentModal({ open, onClose, onSuccess }) {
+  const [type, setType]     = useState(INVESTMENT_TYPES[0].value);
+  const [name, setName]     = useState('');
+  const [value, setValue]   = useState('');
+  const [errors, setErrors] = useState([]);
+  const [busy, setBusy]     = useState(false);
+
+  useEffect(() => {
+    if (open) { setType(INVESTMENT_TYPES[0].value); setName(''); setValue(''); setErrors([]); }
+  }, [open]);
+
+  async function submit(e) {
+    e.preventDefault();
+    const errs = [];
+    if (!name.trim()) errs.push('Name is required');
+    if (!value || Number(value) <= 0) errs.push('Value must be positive');
+    if (errs.length) { setErrors(errs); return; }
+    setBusy(true);
+    try {
+      await api.post('/investments', { type, name: name.trim(), value: Number(value) });
+      onSuccess();
+      onClose();
+    } catch (err) {
+      setErrors(err.errors || [err.error || 'Save failed']);
+    } finally { setBusy(false); }
+  }
+
+  const inputCls = 'w-full rounded-xl px-3 py-2.5 text-sm outline-none transition-all';
+  const inputSt  = { background: 'var(--canvas)', border: '1.5px solid var(--border)', color: 'var(--ink)' };
+
+  return (
+    <Modal open={open} onClose={onClose}>
+      <Card padding="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-bold text-base" style={{ color: 'var(--ink)' }}>
+            Add Investment / Asset
+          </h2>
+          <button onClick={onClose} className="text-xl leading-none" style={{ color: 'var(--muted)' }} aria-label="Close">
+            ×
+          </button>
+        </div>
+
+        <form onSubmit={submit} noValidate className="flex flex-col gap-3">
+          <div>
+            <p className="text-label mb-1">Type</p>
+            <select value={type} onChange={(e) => setType(e.target.value)} className={inputCls} style={inputSt}>
+              {INVESTMENT_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <p className="text-label mb-1">Name / Label</p>
+            <input
+              type="text"
+              placeholder="e.g. S&P 500 Index Fund"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className={inputCls}
+              style={inputSt}
+            />
+          </div>
+
+          <div>
+            <p className="text-label mb-1">Value ($)</p>
+            <input
+              type="number"
+              min="0.01"
+              step="0.01"
+              placeholder="0.00"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              className={inputCls}
+              style={inputSt}
+            />
+          </div>
+
+          {errors.length > 0 && (
+            <ul className="text-xs rounded-lg p-3" style={{ background: 'rgba(226,87,76,0.08)', color: 'var(--rose)' }}>
+              {errors.map((err, i) => (
+                <li key={i}>• {err}</li>
+              ))}
+            </ul>
+          )}
+
+          <button
+            type="submit"
+            disabled={busy}
+            className="w-full py-2.5 rounded-xl font-semibold text-white text-sm mt-1 transition-all"
+            style={{ background: busy ? 'var(--muted)' : CORAL }}
+          >
+            {busy ? 'Saving…' : 'Save Investment'}
+          </button>
+        </form>
+      </Card>
+    </Modal>
+  );
+}
+
 /* ─── Page ─── */
 export default function Analytics() {
   const [history,    setHistory]    = useState([]);
   const [breakdown,  setBreakdown]  = useState(null);
   const [loading,    setLoading]    = useState(true);
+  const [showInvestModal, setShowInvestModal] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -66,9 +197,9 @@ export default function Analytics() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   /* ─── Derived stats ─── */
-  const latestNW   = history.length ? history[history.length - 1].net_worth : 0;
-  const prevNW     = history.length > 1 ? history[history.length - 2].net_worth : latestNW;
-  const nwDelta    = prevNW ? (((latestNW - prevNW) / Math.abs(prevNW)) * 100).toFixed(1) : 0;
+  const latestNW   = history.length > 0 ? history[history.length - 1].net_worth : 0;
+  const prevNW     = history.length > 1 ? history[history.length - 2].net_worth : null;
+  const nwDelta    = (prevNW !== null && Number(prevNW) !== 0) ? (((latestNW - prevNW) / Math.abs(prevNW)) * 100).toFixed(1) : null;
 
   const latestRate = breakdown?.savingsRate?.length
     ? Number(breakdown.savingsRate[breakdown.savingsRate.length - 1].rate)
@@ -118,11 +249,20 @@ export default function Analytics() {
   return (
     <main className="max-w-7xl mx-auto px-4 py-8 animate-fade-in flex flex-col gap-6">
       {/* ── Header ── */}
-      <div>
-        <h1 className="text-2xl font-bold" style={{ color: 'var(--ink)' }}>Wealth Analytics</h1>
-        <p className="text-sm mt-0.5" style={{ color: 'var(--muted)' }}>
-          Track how your money grows over time
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--ink)' }}>Wealth Analytics</h1>
+          <p className="text-sm mt-0.5" style={{ color: 'var(--muted)' }}>
+            Track how your money grows over time
+          </p>
+        </div>
+        <button
+          onClick={() => setShowInvestModal(true)}
+          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-white shadow-sm transition-all hover:opacity-90 active:scale-95"
+          style={{ background: CORAL }}
+        >
+          <span>+</span> Add Investment
+        </button>
       </div>
 
       {/* ── Top stat cards ── */}
@@ -130,9 +270,15 @@ export default function Analytics() {
         <Card padding="p-5">
           <Card.Label>Net Worth</Card.Label>
           <p className="text-stat font-bold mt-1" style={{ color: 'var(--ink)' }}>{fmt(latestNW)}</p>
-          <Card.Delta direction={Number(nwDelta) >= 0 ? 'up' : 'down'}>
-            {Math.abs(nwDelta)}% vs last month
-          </Card.Delta>
+          {nwDelta !== null ? (
+            <Card.Delta direction={Number(nwDelta) >= 0 ? 'up' : 'down'}>
+              {Math.abs(Number(nwDelta))}% vs last month
+            </Card.Delta>
+          ) : (
+            <Card.Delta direction="neutral">
+              No previous month data
+            </Card.Delta>
+          )}
         </Card>
         <Card padding="p-5">
           <Card.Label>Portfolio Value</Card.Label>
@@ -222,6 +368,13 @@ export default function Analytics() {
               <span className="text-3xl">📊</span>
               <p className="font-semibold text-sm" style={{ color: 'var(--ink)' }}>No investments recorded</p>
               <p className="text-xs" style={{ color: 'var(--muted)' }}>Add your assets, cash, or investments to view your portfolio breakdown!</p>
+              <button
+                onClick={() => setShowInvestModal(true)}
+                className="mt-2 flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-white shadow-sm transition-all hover:opacity-90 active:scale-95"
+                style={{ background: CORAL }}
+              >
+                <span>+</span> Add Investment
+              </button>
             </div>
           ) : (
             <div className="flex items-center justify-center mt-4" style={{ height: 240 }}>
@@ -308,6 +461,13 @@ export default function Analytics() {
           </div>
         )}
       </Card>
+
+      {/* ── Add Investment Modal ── */}
+      <AddInvestmentModal
+        open={showInvestModal}
+        onClose={() => setShowInvestModal(false)}
+        onSuccess={fetchData}
+      />
     </main>
   );
 }

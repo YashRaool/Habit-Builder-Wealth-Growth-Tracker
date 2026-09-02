@@ -39,9 +39,19 @@ router.get('/net-worth-history', async (req, res) => {
   );
   const investmentTotal = Number(invRow.total);
 
+  // Get user creation date to bound history
+  const { rows: [userRow] } = await pool.query('SELECT created_at FROM users WHERE id=$1', [uid]);
+  const createdAt = userRow.created_at;
+  const createdMonthStr = `${createdAt.getFullYear()}-${String(createdAt.getMonth()+1).padStart(2,'0')}`;
+
   // Build monthly series
   const incMap = Object.fromEntries(incomeByMonth.map(r => [r.month, Number(r.total)]));
   const expMap = Object.fromEntries(expenseByMonth.map(r => [r.month, Number(r.total)]));
+
+  // Determine the earliest valid month for this user
+  const allMonths = [createdMonthStr, ...Object.keys(incMap), ...Object.keys(expMap)];
+  allMonths.sort();
+  const earliestMonth = allMonths[0];
 
   const series = [];
   let cumulative = 0;
@@ -49,6 +59,10 @@ router.get('/net-worth-history', async (req, res) => {
   for (let i = months - 1; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    
+    // Only include months that are >= the earliest known activity month
+    if (key < earliestMonth) continue;
+
     const inc = incMap[key] || 0;
     const exp = expMap[key] || 0;
     cumulative += (inc - exp);

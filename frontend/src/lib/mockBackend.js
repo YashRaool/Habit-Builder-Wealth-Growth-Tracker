@@ -250,9 +250,17 @@ window.fetch = async function(input, init) {
     ]);
   }
   if (route === '/analytics/breakdown' && method === 'GET') {
+    // Group investments by type (cash, investment, asset) — matches real backend
+    const investByType = store.investments.reduce((acc, inv) => {
+      const t = inv.type || 'investment';
+      acc[t] = (acc[t] || 0) + Number(inv.value || 0);
+      return acc;
+    }, {});
+    const investmentRows = Object.entries(investByType).map(([type, total]) => ({ type, total }));
+
     return response({
       savingsRate: [{ month: 'Current', rate: 25, income: 5000, expenses: 3750 }],
-      investments: [{ total: store.investments.reduce((a, b) => a + Number(b.amount || 0), 0) }],
+      investments: investmentRows,
       expensesByCategory: Object.entries(store.expenses.reduce((acc, curr) => {
         acc[curr.category] = (acc[curr.category] || 0) + Number(curr.amount);
         return acc;

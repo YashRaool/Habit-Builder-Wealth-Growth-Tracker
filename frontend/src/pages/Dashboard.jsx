@@ -20,6 +20,12 @@ const INCOME_SOURCES = [
   'Salary', 'Freelance', 'Side hustle', 'Bonus', 'Investment return', 'Gift', 'Other',
 ];
 
+const INVESTMENT_TYPES = [
+  { value: 'cash',       label: 'Cash / Savings' },
+  { value: 'investment', label: 'Stocks / Funds' },
+  { value: 'asset',      label: 'Real Estate / Assets' },
+];
+
 /* ─── Generic Modal Container ─── */
 function Modal({ open, onClose, children }) {
   useEffect(() => {
@@ -168,6 +174,107 @@ function QuickRecordModal({ type, open, onClose, onSuccess }) {
   );
 }
 
+/* ─── Add Investment Modal ─── */
+function AddInvestmentModal({ open, onClose, onSuccess }) {
+  const [type, setType]     = useState(INVESTMENT_TYPES[0].value);
+  const [name, setName]     = useState('');
+  const [value, setValue]   = useState('');
+  const [errors, setErrors] = useState([]);
+  const [busy, setBusy]     = useState(false);
+
+  useEffect(() => {
+    if (open) { setType(INVESTMENT_TYPES[0].value); setName(''); setValue(''); setErrors([]); }
+  }, [open]);
+
+  async function submit(e) {
+    e.preventDefault();
+    const errs = [];
+    if (!name.trim()) errs.push('Name is required');
+    if (!value || Number(value) <= 0) errs.push('Value must be positive');
+    if (errs.length) { setErrors(errs); return; }
+    setBusy(true);
+    try {
+      await api.post('/investments', { type, name: name.trim(), value: Number(value) });
+      onSuccess();
+      onClose();
+    } catch (err) {
+      setErrors(err.errors || [err.error || 'Save failed']);
+    } finally { setBusy(false); }
+  }
+
+  const inputCls = 'w-full rounded-xl px-3 py-2.5 text-sm outline-none transition-all';
+  const inputSt  = { background: 'var(--canvas)', border: '1.5px solid var(--border)', color: 'var(--ink)' };
+
+  return (
+    <Modal open={open} onClose={onClose}>
+      <Card padding="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-bold text-base" style={{ color: 'var(--ink)' }}>
+            Add Investment / Asset
+          </h2>
+          <button onClick={onClose} className="text-xl leading-none" style={{ color: 'var(--muted)' }} aria-label="Close">
+            ×
+          </button>
+        </div>
+
+        <form onSubmit={submit} noValidate className="flex flex-col gap-3">
+          <div>
+            <p className="text-label mb-1">Type</p>
+            <select value={type} onChange={(e) => setType(e.target.value)} className={inputCls} style={inputSt}>
+              {INVESTMENT_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <p className="text-label mb-1">Name / Label</p>
+            <input
+              type="text"
+              placeholder="e.g. S&P 500 Index Fund"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className={inputCls}
+              style={inputSt}
+            />
+          </div>
+
+          <div>
+            <p className="text-label mb-1">Value ($)</p>
+            <input
+              type="number"
+              min="0.01"
+              step="0.01"
+              placeholder="0.00"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              className={inputCls}
+              style={inputSt}
+            />
+          </div>
+
+          {errors.length > 0 && (
+            <ul className="text-xs rounded-lg p-3" style={{ background: 'rgba(226,87,76,0.08)', color: 'var(--rose)' }}>
+              {errors.map((err, i) => (
+                <li key={i}>• {err}</li>
+              ))}
+            </ul>
+          )}
+
+          <button
+            type="submit"
+            disabled={busy}
+            className="w-full py-2.5 rounded-xl font-semibold text-white text-sm mt-1 transition-all"
+            style={{ background: busy ? 'var(--muted)' : 'var(--coral)' }}
+          >
+            {busy ? 'Saving…' : 'Save Investment'}
+          </button>
+        </form>
+      </Card>
+    </Modal>
+  );
+}
+
 /* ─── Quick Deposit Modal for Savings Goals ─── */
 function QuickDepositModal({ goal, open, onClose, onSuccess }) {
   const [amount, setAmount] = useState('');
@@ -272,6 +379,7 @@ export default function Dashboard() {
   const [quickModal, setQuickModal] = useState(null); // 'expense' | 'income' | null
   const [depositGoal, setDepositGoal] = useState(null); // goal object | null
   const [checkingHabitId, setCheckingHabitId] = useState(null);
+  const [showInvestModal, setShowInvestModal] = useState(false);
 
   /* ── Fetch summary data from all tasks ── */
   const fetchAllData = useCallback(async () => {
@@ -321,9 +429,12 @@ export default function Dashboard() {
   }, [fetchAllData]);
 
   /* ── Net Worth Calculations (Matches Analytics & Tracker) ── */
-  const latestNW = history.length ? Number(history[history.length - 1].net_worth) : 0;
-  const prevNW = history.length > 1 ? Number(history[history.length - 2].net_worth) : latestNW;
-  const nwDelta = prevNW ? (((latestNW - prevNW) / Math.abs(prevNW)) * 100).toFixed(1) : '0.0';
+  /* ── Net Worth Calculations (Matches Analytics & Tracker) ── */
+  const latestNW = history.length > 0 ? Number(history[history.length - 1].net_worth) : 0;
+  const prevNW = history.length > 1 ? Number(history[history.length - 2].net_worth) : null;
+  const nwDelta = (prevNW !== null && prevNW !== 0) 
+    ? (((latestNW - prevNW) / Math.abs(prevNW)) * 100).toFixed(1) 
+    : null;
 
   /* ── Income vs. Expenses This Month (Matches Tracker) ── */
   const curM = curMonthStr();
@@ -401,6 +512,13 @@ export default function Dashboard() {
           >
             <span>+</span> Add Income
           </button>
+          <button
+            onClick={() => setShowInvestModal(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-white shadow-sm transition-all hover:opacity-90 active:scale-95"
+            style={{ background: 'var(--coral)' }}
+          >
+            <span>+</span> Add Investment
+          </button>
           <a
             href="#habits-section"
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all hover:opacity-90 active:scale-95"
@@ -431,9 +549,15 @@ export default function Dashboard() {
                 <Card.Stat className="text-3xl">{fmt(latestNW)}</Card.Stat>
               </div>
               <div className="mt-4 flex items-center justify-between">
-                <Card.Delta direction={Number(nwDelta) >= 0 ? 'up' : 'down'}>
-                  {Math.abs(Number(nwDelta))}% vs last month
-                </Card.Delta>
+                {nwDelta !== null ? (
+                  <Card.Delta direction={Number(nwDelta) >= 0 ? 'up' : 'down'}>
+                    {Math.abs(Number(nwDelta))}% vs last month
+                  </Card.Delta>
+                ) : (
+                  <Card.Delta direction="neutral">
+                    No previous month data
+                  </Card.Delta>
+                )}
                 <span className="text-xs" style={{ color: 'var(--muted)' }}>
                   Cash flow + Investments
                 </span>
@@ -659,6 +783,12 @@ export default function Dashboard() {
         goal={depositGoal}
         open={Boolean(depositGoal)}
         onClose={() => setDepositGoal(null)}
+        onSuccess={fetchAllData}
+      />
+
+      <AddInvestmentModal
+        open={showInvestModal}
+        onClose={() => setShowInvestModal(false)}
         onSuccess={fetchAllData}
       />
     </main>
