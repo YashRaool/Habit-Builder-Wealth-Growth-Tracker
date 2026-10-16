@@ -2,6 +2,8 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { sendUnauthorized } = require('../utils/response');
 
+const JWT_SECRET = process.env.JWT_SECRET || 'financial_habit_tracker_default_jwt_secret_key_safe_fallback_2026';
+
 /** Verifies JWT token and attaches the user to req.user */
 const protect = async (req, res, next) => {
   let token;
@@ -15,7 +17,7 @@ const protect = async (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, JWT_SECRET);
     const user = await User.findById(decoded.id).select('-passwordHash');
 
     if (!user) {
@@ -32,9 +34,8 @@ const protect = async (req, res, next) => {
     if (err.name === 'TokenExpiredError') {
       return sendUnauthorized(res, 'Your session has expired. Please log in again.');
     }
-    return sendUnauthorized(res, 'Invalid or expired token.');
+    return sendUnauthorized(res, 'Invalid or expired authentication token.');
   }
 };
 
-module.exports = { protect };
-
+module.exports = { protect, JWT_SECRET };

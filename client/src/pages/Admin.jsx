@@ -7,16 +7,19 @@ import {
 } from 'lucide-react';
 import { adminAPI } from '../api/admin';
 import { useToast } from '../context/ToastContext';
+import Card, { StatCard } from '../components/ui/Card';
 import Button from '../components/ui/Button';
-import Spinner from '../components/ui/Spinner';
 import Modal from '../components/ui/Modal';
-import { Select } from '../components/ui/Input';
+import Input, { Select, Textarea } from '../components/ui/Input';
+import Badge from '../components/ui/Badge';
+import PageHeader from '../components/layout/PageHeader';
+import { StatCardSkeleton, TableSkeleton } from '../components/ui/Skeleton';
 
 /* ─── Status config ─────────────────────────────────────────────── */
 const STATUS_CFG = {
-  open:        { label: 'Open',        icon: AlertCircle, cls: 'bg-red-50 text-red-600 border-red-200'    },
-  in_progress: { label: 'In Progress', icon: Clock,       cls: 'bg-amber-50 text-amber-600 border-amber-200' },
-  resolved:    { label: 'Resolved',    icon: CheckCircle, cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  open: { label: 'Open', color: 'rose', icon: AlertCircle },
+  in_progress: { label: 'In Progress', color: 'amber', icon: Clock },
+  resolved: { label: 'Resolved', color: 'emerald', icon: CheckCircle },
 };
 
 /* ─── Avatar initials ───────────────────────────────────────────── */
@@ -25,54 +28,19 @@ function Avatar({ name, size = 'md' }) {
     ? name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
     : '?';
   const palette = [
-    'bg-violet-100 text-violet-700',
-    'bg-blue-100 text-blue-700',
-    'bg-emerald-100 text-emerald-700',
-    'bg-amber-100 text-amber-700',
-    'bg-rose-100 text-rose-700',
-    'bg-cyan-100 text-cyan-700',
+    'bg-violet-100 text-violet-700 border-violet-200',
+    'bg-blue-100 text-blue-700 border-blue-200',
+    'bg-emerald-100 text-emerald-700 border-emerald-200',
+    'bg-amber-100 text-amber-700 border-amber-200',
+    'bg-rose-100 text-rose-700 border-rose-200',
+    'bg-cyan-100 text-cyan-700 border-cyan-200',
   ];
   const color = palette[(name?.charCodeAt(0) || 0) % palette.length];
-  const sz = size === 'lg' ? 'w-10 h-10 text-sm' : 'w-8 h-8 text-xs';
+  const sz = size === 'lg' ? 'w-10 h-10 text-xs' : 'w-8 h-8 text-2xs';
   return (
-    <span className={`${sz} ${color} rounded-full flex items-center justify-center font-semibold shrink-0`}>
+    <span className={`${sz} ${color} rounded-xl border flex items-center justify-center font-bold shrink-0 shadow-xs`}>
       {initials}
     </span>
-  );
-}
-
-/* ─── Status pill ───────────────────────────────────────────────── */
-function StatusPill({ status }) {
-  const cfg = STATUS_CFG[status] || STATUS_CFG.open;
-  const Icon = cfg.icon;
-  return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${cfg.cls}`}>
-      <Icon size={11} />{cfg.label}
-    </span>
-  );
-}
-
-/* ─── Metric card ───────────────────────────────────────────────── */
-function MetricCard({ icon: Icon, label, value, accent }) {
-  const c = {
-    violet:  { wrap: 'bg-violet-50 border-violet-100 text-violet-600',  val: 'text-violet-700'  },
-    emerald: { wrap: 'bg-emerald-50 border-emerald-100 text-emerald-600', val: 'text-emerald-700' },
-    blue:    { wrap: 'bg-blue-50 border-blue-100 text-blue-600',        val: 'text-blue-700'    },
-    amber:   { wrap: 'bg-amber-50 border-amber-100 text-amber-600',     val: 'text-amber-700'   },
-    red:     { wrap: 'bg-red-50 border-red-100 text-red-500',          val: 'text-red-600'     },
-    cyan:    { wrap: 'bg-cyan-50 border-cyan-100 text-cyan-600',        val: 'text-cyan-700'    },
-  }[accent] || {};
-
-  return (
-    <div className="card hover:shadow-md hover:border-slate-300 transition-all duration-200 flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-slate-500">{label}</span>
-        <span className={`w-8 h-8 flex items-center justify-center rounded-xl border ${c.wrap}`}>
-          <Icon size={15} />
-        </span>
-      </div>
-      <p className={`text-2xl font-bold ${c.val}`}>{value ?? '—'}</p>
-    </div>
   );
 }
 
@@ -84,23 +52,23 @@ function UserActionMenu({ user, onToggleRole, onToggleActive, onDelete }) {
       <button
         onClick={() => setOpen((v) => !v)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
-        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40"
         aria-label="User actions"
       >
         <MoreVertical size={15} />
       </button>
       {open && (
-        <div className="absolute right-0 top-8 z-30 w-44 bg-white border border-slate-200 rounded-xl shadow-lg py-1 animate-fade-in">
+        <div className="absolute right-0 top-8 z-30 w-44 bg-white border border-slate-200/90 rounded-2xl shadow-elevated py-1 animate-fade-in">
           <button
             onClick={() => { setOpen(false); onToggleRole(user); }}
-            className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+            className="flex items-center gap-2 w-full px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
           >
-            {user.role === 'admin' ? <ShieldMinus size={13} /> : <ShieldPlus size={13} />}
-            {user.role === 'admin' ? 'Remove Admin' : 'Make Admin'}
+            {user.role === 'admin' ? <ShieldMinus size={13} className="text-slate-400" /> : <ShieldPlus size={13} className="text-violet-600" />}
+            {user.role === 'admin' ? 'Revoke Admin' : 'Grant Admin'}
           </button>
           <button
             onClick={() => { setOpen(false); onToggleActive(user); }}
-            className={`flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-slate-50
+            className={`flex items-center gap-2 w-full px-3 py-2 text-xs font-medium hover:bg-slate-50 transition-colors
               ${user.isActive ? 'text-amber-600' : 'text-emerald-600'}`}
           >
             {user.isActive ? <UserX size={13} /> : <UserCheck size={13} />}
@@ -109,9 +77,9 @@ function UserActionMenu({ user, onToggleRole, onToggleActive, onDelete }) {
           <div className="h-px bg-slate-100 my-1" />
           <button
             onClick={() => { setOpen(false); onDelete(user); }}
-            className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+            className="flex items-center gap-2 w-full px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 transition-colors"
           >
-            <Trash2 size={13} /> Delete User
+            <Trash2 size={13} /> Delete Account
           </button>
         </div>
       )}
@@ -134,7 +102,6 @@ export default function Admin() {
   const [fbNote, setFbNote] = useState('');
   const [saving, setSaving] = useState(false);
 
-  /* ── Fetch all ── */
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
@@ -147,22 +114,25 @@ export default function Admin() {
       setUsers(uRes.data.data.users);
       setFeedback(fRes.data.data.feedback);
     } catch {
-      toast.error('Failed to load admin data.');
+      toast.error('Failed to load admin telemetry.');
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll]);
 
-  /* ── User moderation ── */
   const toggleRole = async (u) => {
     const newRole = u.role === 'admin' ? 'user' : 'admin';
     try {
       await adminAPI.updateUser(u._id, { role: newRole });
-      toast.success(`${u.name} is now ${newRole}.`);
+      toast.success(`${u.name} role changed to ${newRole}.`);
       setUsers((prev) => prev.map((x) => x._id === u._id ? { ...x, role: newRole } : x));
-    } catch { toast.error('Update failed.'); }
+    } catch {
+      toast.error('Role update failed.');
+    }
   };
 
   const toggleActive = async (u) => {
@@ -170,19 +140,22 @@ export default function Admin() {
       await adminAPI.updateUser(u._id, { isActive: !u.isActive });
       toast.success(`${u.name} ${u.isActive ? 'deactivated' : 'activated'}.`);
       setUsers((prev) => prev.map((x) => x._id === u._id ? { ...x, isActive: !x.isActive } : x));
-    } catch { toast.error('Update failed.'); }
+    } catch {
+      toast.error('Status update failed.');
+    }
   };
 
   const deleteUser = async (u) => {
-    if (!window.confirm(`Permanently delete ${u.name} and ALL their data? This cannot be undone.`)) return;
+    if (!window.confirm(`Permanently delete account "${u.name}" and all associated financial records?`)) return;
     try {
       await adminAPI.deleteUser(u._id);
-      toast.success(`${u.name} deleted.`);
+      toast.success(`Account for ${u.name} deleted.`);
       setUsers((prev) => prev.filter((x) => x._id !== u._id));
-    } catch { toast.error('Delete failed.'); }
+    } catch {
+      toast.error('Deletion failed.');
+    }
   };
 
-  /* ── Feedback modal ── */
   const openFbModal = (fb) => {
     setSelectedFb(fb);
     setFbStatus(fb.status);
@@ -194,81 +167,89 @@ export default function Admin() {
     setSaving(true);
     try {
       await adminAPI.updateFeedback(selectedFb._id, { status: fbStatus, adminNote: fbNote });
-      toast.success('Feedback updated.');
+      toast.success('Feedback ticket resolved.');
       setFbModal(false);
       fetchAll();
-    } catch { toast.error('Update failed.'); }
-    finally { setSaving(false); }
+    } catch {
+      toast.error('Failed to update ticket.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const filteredUsers = users.filter(
-    (u) => u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase())
+    (u) =>
+      u.name.toLowerCase().includes(search.toLowerCase()) ||
+      u.email.toLowerCase().includes(search.toLowerCase())
   );
 
   const openCount = feedback.filter((f) => f.status === 'open').length;
 
-  /* ── Tabs config ── */
   const TABS = [
-    { key: 'metrics',  label: 'Overview',  icon: BarChart3,     badge: null },
-    { key: 'users',    label: 'Users',     icon: Users,         badge: users.length },
-    { key: 'feedback', label: 'Feedback',  icon: MessageSquare, badge: openCount || null },
+    { key: 'metrics', label: 'Platform Telemetry', icon: BarChart3, badge: null },
+    { key: 'users', label: 'User Directory', icon: Users, badge: users.length },
+    { key: 'feedback', label: 'Support Queue', icon: MessageSquare, badge: openCount || null },
   ];
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 gap-3">
-        <Spinner size="lg" />
-        <p className="text-sm text-slate-400">Loading admin data…</p>
+      <div className="space-y-6 animate-fade-in">
+        <PageHeader title="Admin Console" description="Platform moderation, user management, and support telemetry." />
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <StatCardSkeleton key={i} />
+          ))}
+        </div>
+        <TableSkeleton rows={6} />
       </div>
     );
   }
 
   return (
     <div className="space-y-6 animate-fade-in">
-
-      {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl bg-violet-100 border border-violet-200 flex items-center justify-center shrink-0">
-            <ShieldCheck size={20} className="text-violet-600" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Admin Panel</h1>
-            <p className="text-sm text-slate-500 mt-0.5">Platform management, moderation &amp; support.</p>
-          </div>
-        </div>
-        {/* Quick status strip */}
-        <div className="flex items-center gap-3 text-xs text-slate-500">
-          <span className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
-            {users.filter((u) => u.isActive).length} active users
-          </span>
+      {/* Header */}
+      <PageHeader
+        title="Admin Console"
+        description="Enterprise platform telemetry, user management, and customer support queues."
+      >
+        <div className="flex items-center gap-2">
+          <Badge color="violet" size="md">
+            <ShieldCheck size={13} /> Administrator Level
+          </Badge>
           {openCount > 0 && (
-            <span className="flex items-center gap-1 text-red-500 font-medium">
-              <AlertCircle size={12} /> {openCount} open ticket{openCount > 1 ? 's' : ''}
-            </span>
+            <Badge color="rose" size="md">
+              <AlertCircle size={13} /> {openCount} Pending Ticket{openCount > 1 ? 's' : ''}
+            </Badge>
           )}
         </div>
-      </div>
+      </PageHeader>
 
-      {/* ── Segmented Tabs ── */}
-      <div className="flex sm:inline-flex max-w-full overflow-x-auto no-scrollbar items-center gap-1 bg-slate-100 border border-slate-200 p-1 rounded-xl">
+      {/* Segmented Navigation Tabs */}
+      <div className="inline-flex max-w-full overflow-x-auto no-scrollbar items-center gap-1 bg-slate-100 border border-slate-200/90 p-1 rounded-xl">
         {TABS.map(({ key, label, icon: Icon, badge }) => (
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200
-              ${tab === key
-                ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
-                : 'text-slate-500 hover:text-slate-700'}`}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40
+              ${
+                tab === key
+                  ? 'bg-white text-slate-900 shadow-xs border border-slate-200/80'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
           >
-            <Icon size={14} />
+            <Icon size={14} className={tab === key ? 'text-emerald-600' : 'text-slate-400'} />
             {label}
             {badge != null && (
-              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none
-                ${tab === key
-                  ? key === 'feedback' ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-600'
-                  : 'bg-slate-200 text-slate-500'}`}>
+              <span
+                className={`text-2xs font-bold px-1.5 py-0.5 rounded-full tabular-nums leading-none
+                ${
+                  tab === key
+                    ? key === 'feedback'
+                      ? 'bg-rose-100 text-rose-700'
+                      : 'bg-slate-100 text-slate-700'
+                    : 'bg-slate-200/70 text-slate-500'
+                }`}
+              >
                 {badge}
               </span>
             )}
@@ -280,171 +261,152 @@ export default function Admin() {
       {tab === 'metrics' && metrics && (
         <div className="space-y-4">
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4">
-            <MetricCard icon={Users}       label="Total Users"       value={metrics.totalUsers}       accent="violet" />
-            <MetricCard icon={TrendingUp}  label="New This Month"    value={metrics.newUsersThisMonth} accent="emerald" />
-            <MetricCard icon={Activity}    label="Transactions"      value={metrics.totalTransactions} accent="blue" />
-            <MetricCard icon={Flame}       label="Habits"            value={metrics.totalHabits}       accent="amber" />
-            <MetricCard icon={Target}      label="Goals"             value={metrics.totalGoals}        accent="cyan" />
-            <MetricCard icon={MessageSquare} label="Open Feedback"   value={metrics.openFeedback}      accent="red" />
+            <StatCard
+              icon={Users}
+              label="Total Accounts"
+              value={<span className="tabular-nums">{metrics.totalUsers}</span>}
+              color="violet"
+            />
+            <StatCard
+              icon={TrendingUp}
+              label="New This Month"
+              value={<span className="tabular-nums">{metrics.newUsersThisMonth}</span>}
+              color="emerald"
+            />
+            <StatCard
+              icon={Activity}
+              label="Transactions"
+              value={<span className="tabular-nums">{metrics.totalTransactions}</span>}
+              color="blue"
+            />
+            <StatCard
+              icon={Flame}
+              label="Active Habits"
+              value={<span className="tabular-nums">{metrics.totalHabits}</span>}
+              color="amber"
+            />
+            <StatCard
+              icon={Target}
+              label="Capital Goals"
+              value={<span className="tabular-nums">{metrics.totalGoals}</span>}
+              color="cyan"
+            />
+            <StatCard
+              icon={MessageSquare}
+              label="Support Tickets"
+              value={<span className="tabular-nums">{metrics.openFeedback}</span>}
+              color={metrics.openFeedback > 0 ? 'red' : 'emerald'}
+            />
           </div>
 
-          {/* Health summary row */}
-          <div className="card border-slate-200">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Platform snapshot</p>
+          {/* Platform Snapshot Card */}
+          <Card className="p-5 sm:p-6">
+            <p className="text-2xs font-semibold text-slate-400 uppercase tracking-wider mb-4">Database Platform Audit</p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
               {[
-                { label: 'Active Users',        value: users.filter((u) => u.isActive).length },
-                { label: 'Admin Accounts',      value: users.filter((u) => u.role === 'admin').length },
-                { label: 'Pending Feedback',    value: feedback.filter((f) => f.status !== 'resolved').length },
-                { label: 'Resolved Feedback',   value: feedback.filter((f) => f.status === 'resolved').length },
+                { label: 'Active Active Users', value: users.filter((u) => u.isActive).length },
+                { label: 'System Admin Roles', value: users.filter((u) => u.role === 'admin').length },
+                { label: 'Pending Feedback', value: feedback.filter((f) => f.status !== 'resolved').length },
+                { label: 'Resolved Tickets', value: feedback.filter((f) => f.status === 'resolved').length },
               ].map(({ label, value }) => (
-                <div key={label}>
-                  <p className="text-xl font-bold text-slate-700">{value}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">{label}</p>
+                <div key={label} className="p-3 rounded-xl bg-slate-50/70 border border-slate-100">
+                  <p className="text-2xl font-bold text-slate-900 tabular-nums">{value}</p>
+                  <p className="text-2xs font-medium text-slate-500 mt-1">{label}</p>
                 </div>
               ))}
             </div>
-          </div>
+          </Card>
         </div>
       )}
 
       {/* ══ USERS TAB ════════════════════════════════════════════════ */}
       {tab === 'users' && (
         <div className="space-y-4">
-          {/* Search bar */}
-          <div className="relative max-w-md">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-            <input
-              placeholder="Search by name or email…"
-              className="input-field pl-9 py-2 text-sm"
+          <div className="max-w-md">
+            <Input
+              id="admin-search-users"
+              placeholder="Search directory by name or email…"
+              icon={Search}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              rightElement={
+                search ? (
+                  <button
+                    onClick={() => setSearch('')}
+                    className="p-1 text-slate-400 hover:text-slate-600 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40"
+                    aria-label="Clear search"
+                  >
+                    <X size={14} />
+                  </button>
+                ) : null
+              }
             />
-            {search && (
-              <button 
-                onClick={() => setSearch('')} 
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 rounded-lg p-0.5"
-                aria-label="Clear search"
-              >
-                <X size={14} />
-              </button>
-            )}
           </div>
 
           {filteredUsers.length === 0 ? (
-            <div className="card flex flex-col items-center justify-center py-16 gap-3 text-center">
+            <Card className="flex flex-col items-center justify-center py-16 gap-3 text-center">
               <Users size={32} className="text-slate-300" />
-              <p className="text-sm text-slate-500">No users match "{search}"</p>
-            </div>
+              <p className="text-sm text-slate-600 font-medium">No user accounts found matching "{search}"</p>
+              <Button size="sm" variant="secondary" onClick={() => setSearch('')}>Clear Search Filter</Button>
+            </Card>
           ) : (
-            <>
-              {/* Desktop table */}
-              <div className="card p-0 overflow-hidden hidden md:block">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-slate-100 bg-slate-50/60">
-                        {['User', 'Role', 'Status', 'Joined'].map((h) => (
-                          <th scope="col" key={h} className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">{h}</th>
-                        ))}
-                        <th scope="col" className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider"><span className="sr-only">Actions</span></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {filteredUsers.map((u) => (
-                        <tr key={u._id} className="group hover:bg-slate-50/80 transition-colors">
-                          {/* User col */}
-                          <td className="px-5 py-3.5">
-                            <div className="flex items-center gap-3">
-                              <Avatar name={u.name} />
-                              <div className="min-w-0">
-                                <p className="text-sm font-semibold text-slate-800 truncate">{u.name}</p>
-                                <p className="text-xs text-slate-400 truncate">{u.email}</p>
-                              </div>
+            <Card className="p-0 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50/60">
+                      <th scope="col" className="text-left px-5 py-3 text-2xs font-semibold text-slate-500 uppercase tracking-wider">User Identity</th>
+                      <th scope="col" className="text-left px-5 py-3 text-2xs font-semibold text-slate-500 uppercase tracking-wider">Access Role</th>
+                      <th scope="col" className="text-left px-5 py-3 text-2xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                      <th scope="col" className="text-left px-5 py-3 text-2xs font-semibold text-slate-500 uppercase tracking-wider">Registration Date</th>
+                      <th scope="col" className="px-5 py-3"><span className="sr-only">Actions</span></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredUsers.map((u) => (
+                      <tr key={u._id} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center gap-3">
+                            <Avatar name={u.name} />
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold text-slate-900 truncate">{u.name}</p>
+                              <p className="text-2xs text-slate-400 font-mono truncate">{u.email}</p>
                             </div>
-                          </td>
-                          {/* Role col */}
-                          <td className="px-5 py-3.5">
-                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border
-                              ${u.role === 'admin'
-                                ? 'bg-violet-50 text-violet-700 border-violet-200'
-                                : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
-                              {u.role === 'admin' && <ShieldCheck size={10} />}
-                              {u.role}
-                            </span>
-                          </td>
-                          {/* Status col */}
-                          <td className="px-5 py-3.5">
-                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border
-                              ${u.isActive
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                : 'bg-red-50 text-red-600 border-red-200'}`}>
-                              <span className={`w-1.5 h-1.5 rounded-full ${u.isActive ? 'bg-emerald-500' : 'bg-red-400'}`} />
-                              {u.isActive ? 'Active' : 'Inactive'}
-                            </span>
-                          </td>
-                          {/* Joined col */}
-                          <td className="px-5 py-3.5 text-xs text-slate-400 whitespace-nowrap">
-                            {new Date(u.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                          </td>
-                          {/* Actions col */}
-                          <td className="px-4 py-3.5 text-right">
-                            <UserActionMenu
-                              user={u}
-                              onToggleRole={toggleRole}
-                              onToggleActive={toggleActive}
-                              onDelete={deleteUser}
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="px-5 py-3 border-t border-slate-100 bg-slate-50/40">
-                  <p className="text-xs text-slate-400">
-                    {filteredUsers.length} of {users.length} users
-                  </p>
-                </div>
-              </div>
-
-              {/* Mobile cards */}
-              <div className="md:hidden space-y-3">
-                {filteredUsers.map((u) => (
-                  <div key={u._id} className="card flex items-start gap-3">
-                    <Avatar name={u.name} size="lg" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-slate-800 truncate">{u.name}</p>
-                          <p className="text-xs text-slate-400 truncate">{u.email}</p>
-                        </div>
-                        <UserActionMenu
-                          user={u}
-                          onToggleRole={toggleRole}
-                          onToggleActive={toggleActive}
-                          onDelete={deleteUser}
-                        />
-                      </div>
-                      <div className="flex items-center gap-2 mt-2 flex-wrap">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border
-                          ${u.role === 'admin' ? 'bg-violet-50 text-violet-700 border-violet-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
-                          {u.role === 'admin' && <ShieldCheck size={10} />}{u.role}
-                        </span>
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border
-                          ${u.isActive ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${u.isActive ? 'bg-emerald-500' : 'bg-red-400'}`} />
-                          {u.isActive ? 'Active' : 'Inactive'}
-                        </span>
-                        <span className="text-xs text-slate-400">
+                          </div>
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <Badge color={u.role === 'admin' ? 'violet' : 'slate'} size="sm" variant="rounded">
+                            {u.role === 'admin' && <ShieldCheck size={11} />}
+                            <span className="capitalize">{u.role}</span>
+                          </Badge>
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <Badge color={u.isActive ? 'emerald' : 'rose'} size="sm">
+                            <span className={`w-1.5 h-1.5 rounded-full ${u.isActive ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                            {u.isActive ? 'Active' : 'Deactivated'}
+                          </Badge>
+                        </td>
+                        <td className="px-5 py-3.5 text-xs text-slate-500 tabular-nums whitespace-nowrap">
                           {new Date(u.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                        </td>
+                        <td className="px-4 py-3.5 text-right">
+                          <UserActionMenu
+                            user={u}
+                            onToggleRole={toggleRole}
+                            onToggleActive={toggleActive}
+                            onDelete={deleteUser}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </>
+              <div className="px-5 py-3 border-t border-slate-100 bg-slate-50/40 flex justify-between items-center text-2xs text-slate-400">
+                <span>Displaying <span className="font-semibold text-slate-700 tabular-nums">{filteredUsers.length}</span> user accounts</span>
+                <span className="tabular-nums font-medium text-slate-600">Total Directory: {users.length}</span>
+              </div>
+            </Card>
           )}
         </div>
       )}
@@ -453,64 +415,70 @@ export default function Admin() {
       {tab === 'feedback' && (
         <div className="space-y-3">
           {feedback.length === 0 ? (
-            <div className="card flex flex-col items-center justify-center py-20 gap-3 text-center">
+            <Card className="flex flex-col items-center justify-center py-20 gap-3 text-center">
               <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center">
                 <MessageSquare size={24} className="text-slate-300" />
               </div>
               <div>
-                <p className="font-semibold text-slate-700">No feedback yet</p>
-                <p className="text-sm text-slate-400 mt-1">User support tickets will appear here.</p>
+                <p className="font-semibold text-slate-800 text-sm">No support tickets in queue</p>
+                <p className="text-xs text-slate-400 mt-0.5">User inquiries and app suggestions will be routed here.</p>
               </div>
-            </div>
+            </Card>
           ) : (
-            <div className="space-y-2">
-              {/* Status summary */}
-              <div className="flex items-center gap-3 flex-wrap mb-4">
+            <div className="space-y-3">
+              {/* Status summary pill strip */}
+              <div className="flex items-center gap-2 flex-wrap mb-2">
                 {Object.entries(STATUS_CFG).map(([key, cfg]) => {
                   const count = feedback.filter((f) => f.status === key).length;
                   return (
-                    <div key={key} className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-medium ${cfg.cls}`}>
-                      <cfg.icon size={11} />{cfg.label}: <span className="font-bold">{count}</span>
-                    </div>
+                    <Badge key={key} color={cfg.color} size="md">
+                      <cfg.icon size={12} />
+                      {cfg.label}: <span className="font-bold tabular-nums ml-0.5">{count}</span>
+                    </Badge>
                   );
                 })}
               </div>
 
               {feedback.map((fb) => {
                 const cfg = STATUS_CFG[fb.status] || STATUS_CFG.open;
-                const Icon = cfg.icon;
                 return (
-                  <div
+                  <Card
                     key={fb._id}
-                    className="card hover:shadow-md hover:border-slate-300 transition-all duration-200 cursor-pointer"
+                    className="p-4 sm:p-5 hover:border-slate-300 hover:shadow-card transition-all cursor-pointer"
                     onClick={() => openFbModal(fb)}
                   >
-                    <div className="flex items-start gap-4">
-                      {/* Left: avatar */}
+                    <div className="flex items-start gap-3.5">
                       <Avatar name={fb.userId?.name || '?'} />
-                      {/* Middle: content */}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <StatusPill status={fb.status} />
-                          <span className="text-xs text-slate-400">
-                            {fb.userId?.name || 'Unknown'} · {new Date(fb.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                          <Badge color={cfg.color} size="sm">
+                            <cfg.icon size={11} /> {cfg.label}
+                          </Badge>
+                          <span className="text-2xs text-slate-400 tabular-nums">
+                            {fb.userId?.name || 'Unknown User'} · {new Date(fb.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                           </span>
                         </div>
-                        <p className="text-sm font-semibold text-slate-800">{fb.subject}</p>
-                        <p className="text-sm text-slate-500 truncate mt-0.5">{fb.message}</p>
+                        <p className="text-xs font-bold text-slate-900">{fb.subject}</p>
+                        <p className="text-xs text-slate-600 line-clamp-2 mt-1 leading-relaxed">{fb.message}</p>
                         {fb.adminNote && (
-                          <p className="text-xs text-slate-400 mt-1 italic truncate">Note: {fb.adminNote}</p>
+                          <div className="mt-2 p-2 rounded-lg bg-slate-50 border border-slate-200/80 text-2xs text-slate-600 font-medium">
+                            <span className="font-semibold text-slate-800">Admin Resolution Note:</span> {fb.adminNote}
+                          </div>
                         )}
                       </div>
-                      {/* Right: action */}
-                      <button
-                        onClick={(e) => { e.stopPropagation(); openFbModal(fb); }}
-                        className="px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 text-slate-600 bg-white hover:bg-slate-50 hover:border-slate-300 transition-colors shrink-0"
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openFbModal(fb);
+                        }}
+                        className="shrink-0 text-xs"
                       >
                         Review
-                      </button>
+                      </Button>
                     </div>
-                  </div>
+                  </Card>
                 );
               })}
             </div>
@@ -519,52 +487,51 @@ export default function Admin() {
       )}
 
       {/* ── Feedback Review Modal ── */}
-      <Modal isOpen={fbModal} onClose={() => setFbModal(false)} title="Review Feedback" size="sm">
+      <Modal isOpen={fbModal} onClose={() => setFbModal(false)} title="Support Ticket Resolution" size="sm">
         {selectedFb && (
           <div className="space-y-4">
-            {/* Ticket details */}
-            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-              <div className="flex items-center gap-2">
+            <div className="p-3.5 rounded-xl bg-slate-50/90 border border-slate-200/80 space-y-2.5">
+              <div className="flex items-center gap-2.5">
                 <Avatar name={selectedFb.userId?.name} />
-                <div>
-                  <p className="text-sm font-semibold text-slate-700">{selectedFb.userId?.name || 'Unknown'}</p>
-                  <p className="text-xs text-slate-400">{selectedFb.userId?.email}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold text-slate-900 truncate">{selectedFb.userId?.name || 'Unknown'}</p>
+                  <p className="text-2xs text-slate-400 font-mono truncate">{selectedFb.userId?.email}</p>
                 </div>
-                <div className="ml-auto">
-                  <StatusPill status={selectedFb.status} />
-                </div>
+                <Badge color={STATUS_CFG[selectedFb.status]?.color || 'rose'} size="sm">
+                  {STATUS_CFG[selectedFb.status]?.label || selectedFb.status}
+                </Badge>
               </div>
               <div className="h-px bg-slate-200" />
-              <p className="text-sm font-semibold text-slate-800">{selectedFb.subject}</p>
-              <p className="text-sm text-slate-600 leading-relaxed">{selectedFb.message}</p>
-              <p className="text-xs text-slate-400">
-                {new Date(selectedFb.createdAt).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
-              </p>
+              <p className="text-xs font-semibold text-slate-900">{selectedFb.subject}</p>
+              <p className="text-xs text-slate-600 leading-relaxed bg-white p-2.5 rounded-lg border border-slate-200/60">{selectedFb.message}</p>
             </div>
 
-            {/* Status picker */}
-            <Select label="Update status" value={fbStatus} onChange={(e) => setFbStatus(e.target.value)}>
-              <option value="open">Open</option>
-              <option value="in_progress">In Progress</option>
-              <option value="resolved">Resolved</option>
+            <Select
+              label="Ticket Resolution Status"
+              value={fbStatus}
+              onChange={(e) => setFbStatus(e.target.value)}
+              disabled={saving}
+            >
+              <option value="open">Open (Awaiting triage)</option>
+              <option value="in_progress">In Progress (Investigating)</option>
+              <option value="resolved">Resolved (Closed)</option>
             </Select>
 
-            {/* Admin note */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-slate-700">Admin note (internal)</label>
-              <textarea
-                className="input-field resize-none text-sm"
-                rows={3}
-                placeholder="Add an internal note or resolution summary…"
-                value={fbNote}
-                onChange={(e) => setFbNote(e.target.value)}
-              />
-            </div>
+            <Textarea
+              label="Internal Admin Notes"
+              rows={3}
+              placeholder="Record investigative steps or resolution summary…"
+              value={fbNote}
+              onChange={(e) => setFbNote(e.target.value)}
+              disabled={saving}
+            />
 
-            <div className="flex gap-3 pt-1">
-              <Button variant="secondary" className="flex-1" onClick={() => setFbModal(false)} disabled={saving}>Cancel</Button>
+            <div className="flex gap-2.5 pt-1">
+              <Button variant="secondary" className="flex-1" onClick={() => setFbModal(false)} disabled={saving}>
+                Cancel
+              </Button>
               <Button className="flex-1" loading={saving} onClick={handleFbUpdate} disabled={saving}>
-                {saving ? 'Saving…' : 'Save Changes'}
+                {saving ? 'Updating...' : 'Save Ticket Status'}
               </Button>
             </div>
           </div>

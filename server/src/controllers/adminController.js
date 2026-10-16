@@ -30,30 +30,46 @@ const getUsers = asyncHandler(async (req, res) => {
   const { search, role, page = 1, limit = 20 } = req.query;
   const filter = {};
   if (role) filter.role = role;
-  if (search) filter.$or = [
-    { name: { $regex: search, $options: 'i' } },
-    { email: { $regex: search, $options: 'i' } },
-  ];
+  if (search && typeof search === 'string') {
+    const safeSearch = search.trim();
+    if (safeSearch) {
+      filter.$or = [
+        { name: { $regex: safeSearch, $options: 'i' } },
+        { email: { $regex: safeSearch, $options: 'i' } },
+      ];
+    }
+  }
 
-  const skip = (Number(page) - 1) * Number(limit);
+  const p = Math.max(1, Number(page) || 1);
+  const l = Math.max(1, Number(limit) || 20);
+  const skip = (p - 1) * l;
   const [users, total] = await Promise.all([
-    User.find(filter).sort('-createdAt').skip(skip).limit(Number(limit)),
+    User.find(filter).sort('-createdAt').skip(skip).limit(l),
     User.countDocuments(filter),
   ]);
 
-  res.json({ success: true, data: { users }, pagination: { total, page: Number(page), limit: Number(limit), pages: Math.ceil(total / Number(limit)) } });
+  res.json({
+    success: true,
+    data: { users },
+    pagination: { total, page: p, limit: l, pages: Math.ceil(total / l) || 1 },
+  });
 });
 
 /** PUT /api/admin/users/:id — change role or status */
 const updateUser = asyncHandler(async (req, res) => {
-  const { role, isActive } = req.body;
+  const { role, isActive } = req.body || {};
   const updates = {};
-  if (role) updates.role = role;
-  if (isActive !== undefined) updates.isActive = isActive;
+  if (role) {
+    if (!['user', 'admin'].includes(role)) return sendBadRequest(res, 'Invalid user role.');
+    updates.role = role;
+  }
+  if (isActive !== undefined) {
+    updates.isActive = Boolean(isActive);
+  }
 
   const user = await User.findByIdAndUpdate(req.params.id, updates, { new: true });
   if (!user) return sendNotFound(res, 'User not found.');
-  sendSuccess(res, { user }, 'User updated.');
+  sendSuccess(res, { user }, 'User status updated successfully.');
 });
 
 /** DELETE /api/admin/users/:id — delete a user and their data */
@@ -72,7 +88,7 @@ const deleteUser = asyncHandler(async (req, res) => {
     Feedback.deleteMany({ userId: user._id }),
   ]);
 
-  sendSuccess(res, {}, 'User and associated data deleted.');
+  sendSuccess(res, {}, 'User and associated data deleted successfully.');
 });
 
 /** GET /api/admin/feedback */
@@ -81,35 +97,50 @@ const getFeedback = asyncHandler(async (req, res) => {
   const filter = {};
   if (status) filter.status = status;
 
-  const skip = (Number(page) - 1) * Number(limit);
+  const p = Math.max(1, Number(page) || 1);
+  const l = Math.max(1, Number(limit) || 20);
+  const skip = (p - 1) * l;
   const [feedback, total] = await Promise.all([
-    Feedback.find(filter).populate('userId', 'name email').sort('-createdAt').skip(skip).limit(Number(limit)),
+    Feedback.find(filter).populate('userId', 'name email').sort('-createdAt').skip(skip).limit(l),
     Feedback.countDocuments(filter),
   ]);
 
-  res.json({ success: true, data: { feedback }, pagination: { total, page: Number(page), limit: Number(limit), pages: Math.ceil(total / Number(limit)) } });
+  res.json({
+    success: true,
+    data: { feedback },
+    pagination: { total, page: p, limit: l, pages: Math.ceil(total / l) || 1 },
+  });
 });
 
 /** PUT /api/admin/feedback/:id */
 const updateFeedback = asyncHandler(async (req, res) => {
-  const { status, adminNote } = req.body;
+  const { status, adminNote } = req.body || {};
   if (!status) return sendBadRequest(res, 'Status is required.');
 
   const feedback = await Feedback.findByIdAndUpdate(
     req.params.id,
-    { status, adminNote },
+    { status, ...(adminNote !== undefined && { adminNote: String(adminNote) }) },
     { new: true }
   ).populate('userId', 'name email');
   if (!feedback) return sendNotFound(res, 'Feedback not found.');
-  sendSuccess(res, { feedback }, 'Feedback updated.');
+  sendSuccess(res, { feedback }, 'Feedback ticket updated successfully.');
 });
 
 /** POST /api/admin/feedback — users submit feedback */
 const createFeedback = asyncHandler(async (req, res) => {
-  const { subject, message } = req.body;
-  if (!subject || !message) return sendBadRequest(res, 'Subject and message are required.');
-  const feedback = await Feedback.create({ userId: req.user._id, subject, message });
-  sendSuccess(res, { feedback }, 'Feedback submitted. Thank you!', 201);
+  const subject = typeof req.body?.subject === 'string' ? req.body.subject.trim() : '';
+  const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
+
+  if (!subject || !message) {
+    return sendBadRequest(res, 'Subject and message are required.');
+  }
+  const feedback = await Feedback.create({
+    userId: req.user._id,
+    subject,
+    message,
+    status: 'open',
+  });
+  sendSuccess(res, { feedback }, 'Feedback submitted successfully. Thank you!', 201);
 });
 
 module.exports = { getMetrics, getUsers, updateUser, deleteUser, getFeedback, updateFeedback, createFeedback };

@@ -13,6 +13,8 @@ import Habits from './pages/Habits';
 import Goals from './pages/Goals';
 import Wealth from './pages/Wealth';
 import Admin from './pages/Admin';
+import Feedback from './pages/Feedback';
+import NotFound from './pages/NotFound';
 
 export default function App() {
   return (
@@ -32,10 +34,12 @@ export default function App() {
               <Route path="habits" element={<Habits />} />
               <Route path="goals" element={<Goals />} />
               <Route path="wealth" element={<Wealth />} />
+              <Route path="feedback" element={<Feedback />} />
               <Route path="admin" element={<AdminRoute><Admin /></AdminRoute>} />
             </Route>
 
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            {/* 404 Route */}
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </ToastProvider>
       </AuthProvider>

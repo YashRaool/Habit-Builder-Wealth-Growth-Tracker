@@ -1,0 +1,40 @@
+@layer base {
+  :root {
+    --color-surface-bg: #f8fafc;
+    --color-surface-card: #ffffff;
+    --color-border-subtle: #f1f5f9;
+    --color-border-default: #e2e8f0;
+    --color-border-hover: #cbd5e1;
+    --color-primary: #059669;
+    --color-primary-hover: #047857;
+    --color-primary-subtle: #ecfdf5;
+    --ring-focus-color: rgba(16, 185, 129, 0.4);
+    --radius-card: 1rem;
+    --radius-modal: 1.125rem;
+    --radius-control: 0.625rem;
+  }
+}
+
+@layer utilities {
+  /* Standardized responsive focus ring */
+  .focus-ring {
+    @apply focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white transition-shadow duration-150;
+  }
+
+  .focus-ring-danger {
+    @apply focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/30 focus-visible:ring-offset-2 focus-visible:ring-offset-white transition-shadow duration-150;
+  }
+
+  .focus-ring-subtle {
+    @apply focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:ring-offset-1 focus-visible:ring-offset-white transition-shadow duration-150;
+  }
+
+  /* Crisp borders */
+  .border-clean {
+    @apply border border-slate-200/80;
+  }
+
+  .border-clean-hover {
+    @apply border border-slate-200 hover:border-slate-300 transition-colors duration-150;
+  }
+}

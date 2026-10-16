@@ -14,36 +14,54 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' })
         document.removeEventListener('keydown', handleEscape);
       };
     }
-    return () => { document.body.style.overflow = ''; };
+    return () => {
+      document.body.style.overflow = '';
+    };
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
-  const sizes = { sm: 'max-w-md', md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-4xl' };
+  const sizes = {
+    sm: 'max-w-md',
+    md: 'max-w-lg',
+    lg: 'max-w-2xl',
+    xl: 'max-w-4xl',
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={onClose} />
-      {/* Panel */}
-      <div 
-        role="dialog" 
-        aria-modal="true" 
+      <div
+        className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity animate-fade-in"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+
+      {/* Modal Dialog Panel */}
+      <div
+        role="dialog"
+        aria-modal="true"
         aria-labelledby="modal-title"
-        className={`relative w-full ${sizes[size]} bg-white border border-slate-200 rounded-2xl shadow-2xl animate-slide-up max-h-[90vh] flex flex-col`}
+        className={`relative w-full ${sizes[size] || sizes.md} bg-white border border-slate-200/80 rounded-2xl
+          shadow-elevated animate-slide-up max-h-[90vh] flex flex-col overflow-hidden z-10`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-slate-100">
-          <h2 id="modal-title" className="text-lg font-semibold text-slate-900">{title}</h2>
-          <button 
-            onClick={onClose} 
-            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
+        <div className="flex items-center justify-between px-5 py-4 sm:px-6 sm:py-4.5 border-b border-slate-100 bg-slate-50/50">
+          <h2 id="modal-title" className="text-base sm:text-lg font-semibold tracking-tight text-slate-900">
+            {title}
+          </h2>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100
+              transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:ring-offset-1"
             aria-label="Close modal"
           >
             <X size={18} />
           </button>
         </div>
-        <div className="p-4 sm:p-6 overflow-y-auto">{children}</div>
+
+        {/* Content Body */}
+        <div className="p-5 sm:p-6 overflow-y-auto">{children}</div>
       </div>
     </div>
   );

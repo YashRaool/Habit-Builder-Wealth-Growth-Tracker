@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: import.meta.env.VITE_API_URL || '/api',
   timeout: 15000,
   headers: { 'Content-Type': 'application/json' },
 });
@@ -19,11 +19,29 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const serverMessage =
+      error.response?.data?.message ||
+      error.response?.data?.error ||
+      (error.code === 'ECONNABORTED' ? 'Request timed out. Please try again.' : null) ||
+      error.message ||
+      'Network request failed. Please check your connection.';
+
+    if (error.response && typeof error.response.data === 'object' && error.response.data !== null) {
+      error.response.data.message = serverMessage;
+    }
+
+    const requestUrl = error.config?.url || '';
+    const isAuthEndpoint = requestUrl.includes('/auth/login') || requestUrl.includes('/auth/register');
+    const isAuthPage =
+      typeof window !== 'undefined' &&
+      (window.location.pathname === '/login' || window.location.pathname === '/register');
+
+    if (error.response?.status === 401 && !isAuthEndpoint && !isAuthPage) {
       localStorage.removeItem('fht_token');
       localStorage.removeItem('fht_user');
       window.location.href = '/login';
     }
+
     return Promise.reject(error);
   }
 );

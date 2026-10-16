@@ -9,13 +9,16 @@ import {
 import { transactionsAPI } from '../api/transactions';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import Card, { StatCard } from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import Input, { Select } from '../components/ui/Input';
+import Badge from '../components/ui/Badge';
 import Spinner from '../components/ui/Spinner';
+import PageHeader from '../components/layout/PageHeader';
+import { StatCardSkeleton, TableSkeleton } from '../components/ui/Skeleton';
 
 /* ─── Constants ────────────────────────────────────────────────── */
-
 const CATEGORIES = {
   income: ['Salary', 'Freelance', 'Investment', 'Bonus', 'Gift', 'Other Income'],
   expense: ['Food & Dining', 'Housing', 'Transportation', 'Healthcare', 'Entertainment', 'Shopping', 'Education', 'Utilities', 'Insurance', 'Travel', 'Personal Care', 'Other Expense'],
@@ -43,47 +46,18 @@ const EMPTY_FORM = {
 
 const DEFAULT_FILTERS = { type: '', category: '', search: '', startDate: '', endDate: '', page: 1, limit: 15, sort: '-date' };
 
-/* ─── KPI Card ──────────────────────────────────────────────────── */
-function KpiCard({ icon: Icon, label, value, accent }) {
-  const accents = {
-    emerald: {
-      icon: 'text-emerald-600 bg-emerald-50 border-emerald-100',
-      value: 'text-emerald-600',
-      bar: 'from-emerald-400 to-emerald-600',
-    },
-    red: {
-      icon: 'text-red-500 bg-red-50 border-red-100',
-      value: 'text-red-500',
-      bar: 'from-red-400 to-red-600',
-    },
-    blue: {
-      icon: 'text-blue-600 bg-blue-50 border-blue-100',
-      value: 'text-blue-600',
-      bar: 'from-blue-400 to-blue-600',
-    },
-  };
-  const a = accents[accent] || accents.blue;
-
-  return (
-    <div className="card flex flex-col gap-3 relative overflow-hidden hover:shadow-md hover:border-slate-300 transition-all duration-200">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-slate-500">{label}</span>
-        <span className={`w-9 h-9 flex items-center justify-center rounded-xl border ${a.icon}`}>
-          <Icon size={17} />
-        </span>
-      </div>
-      <p className={`text-2xl font-bold tracking-tight ${a.value}`}>{value}</p>
-      <div className={`absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r opacity-40 ${a.bar}`} />
-    </div>
-  );
-}
-
 /* ─── Category Icon Chip ────────────────────────────────────────── */
 function CategoryChip({ category, type }) {
   const Icon = CATEGORY_ICONS[category] || Wallet;
   const isIncome = type === 'income';
   return (
-    <span className={`inline-flex items-center justify-center w-8 h-8 rounded-lg ${isIncome ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
+    <span
+      className={`inline-flex items-center justify-center w-8 h-8 rounded-xl border shrink-0 ${
+        isIncome
+          ? 'bg-emerald-50 border-emerald-100 text-emerald-600'
+          : 'bg-slate-100/80 border-slate-200/80 text-slate-500'
+      }`}
+    >
       <Icon size={15} />
     </span>
   );
@@ -95,7 +69,9 @@ function ActionMenu({ onEdit, onDelete }) {
   const ref = useRef(null);
 
   useEffect(() => {
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
@@ -104,24 +80,30 @@ function ActionMenu({ onEdit, onDelete }) {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100/80 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40"
         aria-label="Row actions"
       >
         <MoreVertical size={15} />
       </button>
       {open && (
-        <div className="absolute right-0 top-8 z-20 w-36 bg-white border border-slate-200 rounded-xl shadow-lg py-1 animate-fade-in">
+        <div className="absolute right-0 top-8 z-20 w-36 bg-white border border-slate-200/90 rounded-xl shadow-elevated py-1 animate-fade-in">
           <button
-            className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-            onClick={() => { setOpen(false); onEdit(); }}
+            className="flex items-center gap-2 w-full px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+            onClick={() => {
+              setOpen(false);
+              onEdit();
+            }}
           >
-            <Pencil size={13} /> Edit
+            <Pencil size={13} className="text-slate-400" /> Edit
           </button>
           <button
-            className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
-            onClick={() => { setOpen(false); onDelete(); }}
+            className="flex items-center gap-2 w-full px-3 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 transition-colors"
+            onClick={() => {
+              setOpen(false);
+              onDelete();
+            }}
           >
-            <Trash2 size={13} /> Delete
+            <Trash2 size={13} className="text-rose-500" /> Delete
           </button>
         </div>
       )}
@@ -165,18 +147,33 @@ export default function Transactions() {
     }
   }, [filters]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   /* ── Modal helpers ── */
-  const openCreate = () => { setEditTx(null); setForm(EMPTY_FORM); setFormErrors({}); setModalOpen(true); };
-  const openEdit = (tx) => {
-    setEditTx(tx);
-    setForm({ type: tx.type, category: tx.category, amount: tx.amount, date: tx.date?.slice(0, 10), description: tx.description || '', isRecurring: tx.isRecurring || false });
+  const openCreate = () => {
+    setEditTx(null);
+    setForm(EMPTY_FORM);
     setFormErrors({});
     setModalOpen(true);
   };
 
-  /* ── Validation (unchanged rules) ── */
+  const openEdit = (tx) => {
+    setEditTx(tx);
+    setForm({
+      type: tx.type,
+      category: tx.category,
+      amount: tx.amount,
+      date: tx.date?.slice(0, 10),
+      description: tx.description || '',
+      isRecurring: tx.isRecurring || false,
+    });
+    setFormErrors({});
+    setModalOpen(true);
+  };
+
+  /* ── Validation ── */
   const validate = () => {
     const e = {};
     if (!form.type) e.type = 'Required';
@@ -210,7 +207,7 @@ export default function Transactions() {
 
   /* ── Delete ── */
   const handleDelete = async (id) => {
-    if (!window.confirm('Delete this transaction?')) return;
+    if (!window.confirm('Delete this transaction record?')) return;
     try {
       await transactionsAPI.delete(id);
       toast.success('Transaction deleted.');
@@ -229,170 +226,183 @@ export default function Transactions() {
   const cur = summary[summary.length - 1] || { income: 0, expense: 0 };
   const net = cur.income - cur.expense;
 
-  /* ─── Render ─────────────────────────────────────────────────── */
   return (
     <div className="space-y-6 animate-fade-in">
-
-      {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Transactions</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Track, review and manage all your income and expenses.</p>
-        </div>
-        <Button onClick={openCreate} className="self-start sm:self-auto shrink-0">
-          <Plus size={16} /> Add Transaction
+      {/* Page Header */}
+      <PageHeader
+        title="Transactions Ledger"
+        description="Filter, audit, and log verified capital inflows and expenditures."
+      >
+        <Button onClick={openCreate} size="sm">
+          <Plus size={15} /> Add Transaction
         </Button>
+      </PageHeader>
+
+      {/* KPI Cards with tabular nums */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {loading ? (
+          <>
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+          </>
+        ) : (
+          <>
+            <StatCard
+              icon={ArrowUpCircle}
+              label="Total Month Income"
+              value={<span className="tabular-nums">{fmt(cur.income, user?.currency)}</span>}
+              color="emerald"
+            />
+            <StatCard
+              icon={ArrowDownCircle}
+              label="Total Month Expenses"
+              value={<span className="tabular-nums">{fmt(cur.expense, user?.currency)}</span>}
+              color="red"
+            />
+            <StatCard
+              icon={DollarSign}
+              label="Net Month Flow"
+              value={<span className="tabular-nums">{fmt(net, user?.currency)}</span>}
+              color={net >= 0 ? 'emerald' : 'red'}
+            />
+          </>
+        )}
       </div>
 
-      {/* ── KPI Cards ── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <KpiCard icon={ArrowUpCircle} label="Total Income" value={fmt(cur.income, user?.currency)} accent="emerald" />
-        <KpiCard icon={ArrowDownCircle} label="Total Expenses" value={fmt(cur.expense, user?.currency)} accent="red" />
-        <KpiCard
-          icon={DollarSign}
-          label="Net Cash Flow"
-          value={fmt(net, user?.currency)}
-          accent={net >= 0 ? 'emerald' : 'red'}
-        />
-      </div>
-
-      {/* ── Filter Toolbar ── */}
-      <div className="card py-4 px-4 sm:px-5">
-        {/* Top row: search + toggle */}
+      {/* Filter Toolbar */}
+      <Card className="p-4 sm:p-5">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-          <div className="relative flex-1 w-full sm:w-auto">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-            <input
-              placeholder="Search transactions…"
-              className="input-field pl-9 py-2 text-sm"
+          <div className="flex-1 w-full sm:w-auto">
+            <Input
+              id="transaction-search"
+              placeholder="Search by description or category..."
+              icon={Search}
               value={filters.search}
               onChange={setFilter('search')}
+              rightElement={
+                filters.search ? (
+                  <button
+                    onClick={() => setFilters({ ...filters, search: '', page: 1 })}
+                    className="p-1 text-slate-400 hover:text-slate-600 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40"
+                    aria-label="Clear search"
+                  >
+                    <X size={14} />
+                  </button>
+                ) : null
+              }
             />
-            {filters.search && (
-              <button 
-                onClick={() => setFilters({ ...filters, search: '', page: 1 })} 
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 rounded-lg p-0.5"
-                aria-label="Clear search"
-              >
-                <X size={14} />
-              </button>
-            )}
           </div>
-          <div className="flex items-center gap-3 w-full sm:w-auto">
+
+          <div className="flex items-center gap-2.5 w-full sm:w-auto shrink-0">
             <button
               onClick={() => setShowFilters((v) => !v)}
-              className={`inline-flex items-center justify-center flex-1 sm:flex-none gap-1.5 px-3 py-2 rounded-xl text-sm font-medium border transition-all duration-200 shrink-0
-                ${showFilters || hasActiveFilters
-                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+              className={`inline-flex items-center justify-center flex-1 sm:flex-none gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold border transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40
+                ${
+                  showFilters || hasActiveFilters
+                    ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                }`}
             >
               <Filter size={14} />
-              Filters
+              Filter Options
               {hasActiveFilters && (
-                <span className="ml-0.5 w-4 h-4 bg-emerald-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                <span className="w-4 h-4 bg-emerald-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
                   {[filters.type, filters.category, filters.startDate, filters.endDate].filter(Boolean).length}
                 </span>
               )}
             </button>
+
             {hasActiveFilters && (
-              <button onClick={resetFilters} className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 transition-colors shrink-0">
+              <button
+                onClick={resetFilters}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-100/70 rounded-xl transition-colors shrink-0"
+              >
                 <RotateCcw size={13} /> Reset
               </button>
             )}
           </div>
         </div>
 
-        {/* Expandable filter row */}
+        {/* Expandable filters */}
         {showFilters && (
-          <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 animate-fade-in">
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-500">Type</label>
-              <select className="input-field py-2 text-sm appearance-none" value={filters.type} onChange={setFilter('type')}>
-                <option value="">All Types</option>
-                <option value="income">Income</option>
-                <option value="expense">Expense</option>
-              </select>
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-500">Category</label>
-              <select className="input-field py-2 text-sm appearance-none" value={filters.category} onChange={setFilter('category')}>
-                <option value="">All Categories</option>
-                {[...CATEGORIES.income, ...CATEGORIES.expense].map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-500">From</label>
-              <input type="date" className="input-field py-2 text-sm" value={filters.startDate} onChange={setFilter('startDate')} />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-500">To</label>
-              <input type="date" className="input-field py-2 text-sm" value={filters.endDate} onChange={setFilter('endDate')} />
-            </div>
+          <div className="mt-3.5 pt-3.5 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 animate-fade-in">
+            <Select label="Type" value={filters.type} onChange={setFilter('type')}>
+              <option value="">All Flow Types</option>
+              <option value="income">Income</option>
+              <option value="expense">Expense</option>
+            </Select>
+            <Select label="Category" value={filters.category} onChange={setFilter('category')}>
+              <option value="">All Categories</option>
+              {[...CATEGORIES.income, ...CATEGORIES.expense].map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </Select>
+            <Input label="From Date" type="date" value={filters.startDate} onChange={setFilter('startDate')} />
+            <Input label="To Date" type="date" value={filters.endDate} onChange={setFilter('endDate')} />
           </div>
         )}
 
-        {/* Sort row */}
-        <div className="mt-3 flex items-center gap-2 flex-wrap">
-          <span className="text-xs text-slate-400 font-medium shrink-0">Sort:</span>
+        {/* Sort Chips */}
+        <div className="mt-3 pt-2 flex items-center gap-2 flex-wrap">
+          <span className="text-2xs uppercase tracking-wider text-slate-400 font-semibold shrink-0">Sort:</span>
           {[
             { label: 'Newest', value: '-date' },
             { label: 'Oldest', value: 'date' },
-            { label: 'Highest', value: '-amount' },
-            { label: 'Lowest', value: 'amount' },
+            { label: 'Highest Amount', value: '-amount' },
+            { label: 'Lowest Amount', value: 'amount' },
           ].map(({ label, value }) => (
             <button
               key={value}
               onClick={() => setFilters({ ...filters, sort: value, page: 1 })}
-              className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all duration-150
-                ${filters.sort === value
-                  ? 'bg-slate-900 border-slate-900 text-white'
-                  : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'}`}
+              className={`px-2.5 py-1 rounded-lg text-2xs font-semibold border transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40
+                ${
+                  filters.sort === value
+                    ? 'bg-slate-900 border-slate-900 text-white'
+                    : 'bg-white border-slate-200/90 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                }`}
             >
               {label}
             </button>
           ))}
         </div>
-      </div>
+      </Card>
 
-      {/* ── Transaction Table / Cards ── */}
-      <div className="card p-0 overflow-hidden">
+      {/* Transaction Table Card */}
+      <Card className="p-0 overflow-hidden">
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-3">
-            <Spinner size="lg" />
-            <p className="text-sm text-slate-400">Loading transactions…</p>
-          </div>
+          <TableSkeleton rows={8} cols={6} />
         ) : transactions.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3 text-center px-4">
-            <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center">
-              <DollarSign size={26} className="text-slate-300" />
+            <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center border border-slate-200/70">
+              <DollarSign size={24} className="text-slate-400" />
             </div>
             <div>
-              <p className="font-semibold text-slate-700">No transactions yet</p>
-              <p className="text-sm text-slate-400 mt-0.5">
-                {hasActiveFilters ? 'Try adjusting your filters.' : 'Add your first transaction to get started.'}
+              <p className="font-semibold text-slate-800 text-sm">No transactions match your criteria</p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {hasActiveFilters ? 'Reset filters to see more ledger history.' : 'Record your first transaction to initiate metrics.'}
               </p>
             </div>
             {!hasActiveFilters ? (
               <Button onClick={openCreate} size="sm"><Plus size={14} /> Add Transaction</Button>
             ) : (
-              <button onClick={resetFilters} className="text-sm text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1">
-                <RotateCcw size={13} /> Clear filters
-              </button>
+              <Button onClick={resetFilters} variant="secondary" size="sm">
+                <RotateCcw size={13} /> Reset Filters
+              </Button>
             )}
           </div>
         ) : (
           <>
-            {/* Desktop table */}
+            {/* Desktop Table */}
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50/60">
-                    <th scope="col" className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Transaction</th>
-                    <th scope="col" className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Date</th>
-                    <th scope="col" className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Type</th>
-                    <th scope="col" className="text-right px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Amount</th>
+                    <th scope="col" className="text-left px-5 py-3 text-2xs font-semibold text-slate-500 uppercase tracking-wider">Transaction</th>
+                    <th scope="col" className="text-left px-5 py-3 text-2xs font-semibold text-slate-500 uppercase tracking-wider">Category</th>
+                    <th scope="col" className="text-left px-5 py-3 text-2xs font-semibold text-slate-500 uppercase tracking-wider">Date</th>
+                    <th scope="col" className="text-left px-5 py-3 text-2xs font-semibold text-slate-500 uppercase tracking-wider">Type</th>
+                    <th scope="col" className="text-right px-5 py-3 text-2xs font-semibold text-slate-500 uppercase tracking-wider">Amount</th>
                     <th scope="col" className="px-5 py-3"><span className="sr-only">Actions</span></th>
                   </tr>
                 </thead>
@@ -402,54 +412,56 @@ export default function Transactions() {
                       key={tx._id}
                       className="group hover:bg-slate-50/80 transition-colors duration-150"
                     >
-                      {/* Transaction col */}
+                      {/* Description & Category Icon */}
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-3">
                           <CategoryChip category={tx.category} type={tx.type} />
                           <div className="min-w-0">
-                            <p className="text-sm font-medium text-slate-800 truncate max-w-[180px]">
+                            <p className="text-xs font-semibold text-slate-900 truncate max-w-[200px]">
                               {tx.description || tx.category}
                             </p>
-                            <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
-                              {tx.category}
-                              {tx.isRecurring && (
-                                <span className="inline-flex items-center gap-0.5 ml-1 text-blue-500 font-medium">
-                                  <RefreshCw size={10} /> recurring
-                                </span>
-                              )}
-                            </p>
+                            {tx.isRecurring && (
+                              <p className="text-2xs text-blue-600 font-medium flex items-center gap-1 mt-0.5">
+                                <RefreshCw size={10} /> recurring automated
+                              </p>
+                            )}
                           </div>
                         </div>
                       </td>
 
-                      {/* Date col */}
+                      {/* Category Badge */}
                       <td className="px-5 py-3.5">
-                        <span className="inline-flex items-center gap-1.5 text-sm text-slate-500">
-                          <Calendar size={13} className="text-slate-300" />
+                        <Badge color="slate" size="sm">{tx.category}</Badge>
+                      </td>
+
+                      {/* Date */}
+                      <td className="px-5 py-3.5">
+                        <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 tabular-nums">
+                          <Calendar size={13} className="text-slate-400" />
                           {fmtDate(tx.date)}
                         </span>
                       </td>
 
-                      {/* Type badge col */}
+                      {/* Semantic Flow Badge */}
                       <td className="px-5 py-3.5">
-                        <span className={tx.type === 'income' ? 'badge-income' : 'badge-expense'}>
-                          {tx.type === 'income' ? (
-                            <TrendingUp size={11} />
-                          ) : (
-                            <TrendingDown size={11} />
-                          )}
-                          {tx.type}
-                        </span>
+                        <Badge color={tx.type === 'income' ? 'emerald' : 'rose'} size="sm">
+                          {tx.type === 'income' ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+                          <span className="capitalize">{tx.type}</span>
+                        </Badge>
                       </td>
 
-                      {/* Amount col */}
+                      {/* Tabular Amount */}
                       <td className="px-5 py-3.5 text-right">
-                        <span className={`text-sm font-bold tabular-nums ${tx.type === 'income' ? 'text-emerald-600' : 'text-slate-800'}`}>
+                        <span
+                          className={`text-xs font-bold tabular-nums ${
+                            tx.type === 'income' ? 'text-emerald-700' : 'text-slate-900'
+                          }`}
+                        >
                           {tx.type === 'income' ? '+' : '−'}{fmt(tx.amount, user?.currency)}
                         </span>
                       </td>
 
-                      {/* Actions col */}
+                      {/* Actions */}
                       <td className="px-4 py-3.5 text-right">
                         <ActionMenu onEdit={() => openEdit(tx)} onDelete={() => handleDelete(tx._id)} />
                       </td>
@@ -459,26 +471,30 @@ export default function Transactions() {
               </table>
             </div>
 
-            {/* Mobile card list */}
+            {/* Mobile Card List */}
             <div className="md:hidden divide-y divide-slate-100">
               {transactions.map((tx) => (
                 <div key={tx._id} className="flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50 transition-colors">
                   <CategoryChip category={tx.category} type={tx.type} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-medium text-slate-800 truncate">
+                      <p className="text-xs font-semibold text-slate-900 truncate">
                         {tx.description || tx.category}
                       </p>
-                      <span className={`text-sm font-bold tabular-nums shrink-0 ${tx.type === 'income' ? 'text-emerald-600' : 'text-slate-800'}`}>
+                      <span
+                        className={`text-xs font-bold tabular-nums shrink-0 ${
+                          tx.type === 'income' ? 'text-emerald-700' : 'text-slate-900'
+                        }`}
+                      >
                         {tx.type === 'income' ? '+' : '−'}{fmt(tx.amount, user?.currency)}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-xs text-slate-400">{fmtDate(tx.date)}</span>
-                      <span className={tx.type === 'income' ? 'badge-income' : 'badge-expense'} style={{ fontSize: '10px', padding: '1px 6px' }}>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-2xs text-slate-400 tabular-nums">{fmtDate(tx.date)}</span>
+                      <Badge color={tx.type === 'income' ? 'emerald' : 'rose'} size="sm">
                         {tx.type}
-                      </span>
-                      {tx.isRecurring && <RefreshCw size={10} className="text-blue-400" />}
+                      </Badge>
+                      {tx.isRecurring && <RefreshCw size={10} className="text-blue-500" />}
                     </div>
                   </div>
                   <ActionMenu onEdit={() => openEdit(tx)} onDelete={() => handleDelete(tx._id)} />
@@ -486,25 +502,29 @@ export default function Transactions() {
               ))}
             </div>
 
-            {/* Pagination */}
-            <div className="flex flex-col sm:flex-row items-center justify-between px-5 py-3.5 border-t border-slate-100 gap-2">
-              <p className="text-xs text-slate-400 order-2 sm:order-1">
-                Showing <span className="font-medium text-slate-600">{((pagination.page - 1) * filters.limit) + 1}–{Math.min(pagination.page * filters.limit, pagination.total)}</span> of <span className="font-medium text-slate-600">{pagination.total}</span> transactions
+            {/* Pagination Controls */}
+            <div className="flex flex-col sm:flex-row items-center justify-between px-5 py-3 border-t border-slate-100 gap-2.5 bg-slate-50/40">
+              <p className="text-2xs text-slate-500 order-2 sm:order-1">
+                Showing{' '}
+                <span className="font-semibold text-slate-800 tabular-nums">
+                  {((pagination.page - 1) * filters.limit) + 1}–{Math.min(pagination.page * filters.limit, pagination.total)}
+                </span>{' '}
+                of <span className="font-semibold text-slate-800 tabular-nums">{pagination.total}</span> entries
               </p>
               <div className="flex items-center gap-2 order-1 sm:order-2">
                 <button
-                  className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="w-8 h-8 flex items-center justify-center rounded-xl border border-slate-200/90 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40"
                   disabled={pagination.page <= 1}
                   onClick={() => setFilters({ ...filters, page: pagination.page - 1 })}
                   aria-label="Previous page"
                 >
                   <ChevronLeft size={15} />
                 </button>
-                <span className="text-sm text-slate-600 px-1 tabular-nums">
+                <span className="text-xs text-slate-700 font-medium px-1 tabular-nums">
                   {pagination.page} <span className="text-slate-400">/</span> {pagination.pages}
                 </span>
                 <button
-                  className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="w-8 h-8 flex items-center justify-center rounded-xl border border-slate-200/90 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40"
                   disabled={pagination.page >= pagination.pages}
                   onClick={() => setFilters({ ...filters, page: pagination.page + 1 })}
                   aria-label="Next page"
@@ -515,34 +535,40 @@ export default function Transactions() {
             </div>
           </>
         )}
-      </div>
+      </Card>
 
-      {/* ── Add / Edit Modal ── */}
-      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editTx ? 'Edit Transaction' : 'New Transaction'}>
+      {/* Add / Edit Modal */}
+      <Modal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={editTx ? 'Edit Transaction' : 'Record Transaction'}
+      >
         <div className="space-y-4">
-
-          {/* Type picker pills */}
+          {/* Flow Type selector */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-slate-700">Transaction Type</label>
+            <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Flow Direction</label>
             <div className="grid grid-cols-2 gap-2">
               {['expense', 'income'].map((t) => (
                 <button
                   key={t}
                   type="button"
+                  disabled={saving}
                   onClick={() => setForm({ ...form, type: t, category: '' })}
-                  className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-semibold transition-all duration-150
-                    ${form.type === t
-                      ? t === 'income'
-                        ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
-                        : 'bg-red-50 border-red-300 text-red-700'
-                      : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'}`}
+                  className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border text-xs font-semibold transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40
+                    ${
+                      form.type === t
+                        ? t === 'income'
+                          ? 'bg-emerald-50 border-emerald-300 text-emerald-800 shadow-xs'
+                          : 'bg-rose-50 border-rose-300 text-rose-800 shadow-xs'
+                        : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'
+                    }`}
                 >
-                  {t === 'income' ? <TrendingUp size={15} /> : <TrendingDown size={15} />}
-                  {t.charAt(0).toUpperCase() + t.slice(1)}
+                  {t === 'income' ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                  <span className="capitalize">{t}</span>
                 </button>
               ))}
             </div>
-            {formErrors.type && <p className="text-xs text-red-500">{formErrors.type}</p>}
+            {formErrors.type && <p className="text-xs text-rose-500">{formErrors.type}</p>}
           </div>
 
           {/* Category */}
@@ -551,73 +577,80 @@ export default function Transactions() {
             value={form.category}
             onChange={setF('category')}
             error={formErrors.category}
+            disabled={saving}
           >
             <option value="">Select category…</option>
-            {(CATEGORIES[form.type] || []).map((c) => <option key={c} value={c}>{c}</option>)}
+            {(CATEGORIES[form.type] || []).map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
           </Select>
 
           {/* Amount + Date in row */}
           <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-slate-700">Amount</label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium">$</span>
-                <input
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={form.amount}
-                  onChange={setF('amount')}
-                  className={`input-field pl-7 ${formErrors.amount ? 'border-red-300 focus:ring-red-500/20 focus:border-red-500' : ''}`}
-                />
-              </div>
-              {formErrors.amount && <p className="text-xs text-red-500">{formErrors.amount}</p>}
-            </div>
+            <Input
+              label="Amount ($)"
+              type="number"
+              min="0.01"
+              step="0.01"
+              placeholder="0.00"
+              value={form.amount}
+              onChange={setF('amount')}
+              error={formErrors.amount}
+              disabled={saving}
+            />
             <Input
               label="Date"
               type="date"
               value={form.date}
               onChange={setF('date')}
               error={formErrors.date}
+              disabled={saving}
             />
           </div>
 
           {/* Description */}
           <Input
             label="Description (optional)"
-            placeholder="e.g. Monthly rent, Coffee with team…"
+            placeholder="e.g. Monthly rent, Client retainer..."
             value={form.description}
             onChange={setF('description')}
+            disabled={saving}
           />
 
           {/* Recurring toggle */}
-          <label className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
+          <label className="flex items-center gap-3 p-3 rounded-xl border border-slate-200/90 cursor-pointer hover:bg-slate-50 transition-colors">
             <div className="relative">
               <input
                 type="checkbox"
                 checked={form.isRecurring}
+                disabled={saving}
                 onChange={(e) => setForm({ ...form, isRecurring: e.target.checked })}
                 className="sr-only"
                 id="recurring-toggle"
               />
               <div
-                className={`w-9 h-5 rounded-full transition-colors duration-200 ${form.isRecurring ? 'bg-emerald-500' : 'bg-slate-200'}`}
-                onClick={() => setForm({ ...form, isRecurring: !form.isRecurring })}
+                className={`w-9 h-5 rounded-full transition-colors duration-200 ${
+                  form.isRecurring ? 'bg-emerald-600' : 'bg-slate-200'
+                }`}
+                onClick={() => !saving && setForm({ ...form, isRecurring: !form.isRecurring })}
               >
-                <div className={`w-4 h-4 bg-white rounded-full shadow-sm absolute top-0.5 transition-transform duration-200 ${form.isRecurring ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                <div
+                  className={`w-4 h-4 bg-white rounded-full shadow-xs absolute top-0.5 transition-transform duration-200 ${
+                    form.isRecurring ? 'translate-x-4' : 'translate-x-0.5'
+                  }`}
+                />
               </div>
             </div>
             <div>
-              <p className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
-                <RefreshCw size={13} className="text-slate-400" /> Recurring transaction
+              <p className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                <RefreshCw size={12} className="text-slate-400" /> Recurring Schedule
               </p>
-              <p className="text-xs text-slate-400 mt-0.5">This transaction repeats on a regular basis</p>
+              <p className="text-2xs text-slate-400 mt-0.5">Automate or flag recurring cash flows</p>
             </div>
           </label>
 
-          {/* Action buttons */}
-          <div className="flex gap-3 pt-1">
+          {/* Action buttons with submission locking */}
+          <div className="flex gap-2.5 pt-2">
             <Button variant="secondary" className="flex-1" onClick={() => setModalOpen(false)} disabled={saving}>
               Cancel
             </Button>
@@ -627,7 +660,7 @@ export default function Transactions() {
               onClick={handleSave}
               disabled={saving}
             >
-              {saving ? 'Saving…' : editTx ? 'Save Changes' : 'Add Transaction'}
+              {saving ? 'Recording...' : editTx ? 'Save Updates' : 'Add Transaction'}
             </Button>
           </div>
         </div>

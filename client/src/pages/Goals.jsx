@@ -6,10 +6,14 @@ import {
 import { goalsAPI } from '../api/goals';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import Card, { StatCard } from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import Input, { Select } from '../components/ui/Input';
+import Badge from '../components/ui/Badge';
 import Spinner from '../components/ui/Spinner';
+import PageHeader from '../components/layout/PageHeader';
+import { StatCardSkeleton, CardSkeleton } from '../components/ui/Skeleton';
 
 /* ─── Constants ───────────────────────────────────────────────── */
 const GOAL_CATEGORIES = [
@@ -47,38 +51,17 @@ function ProgressBar({ pct, completed }) {
   return (
     <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
       <div
-        className={`h-full rounded-full transition-all duration-700 ${completed
-          ? 'bg-gradient-to-r from-emerald-400 to-emerald-500'
-          : clampedPct >= 75
-            ? 'bg-gradient-to-r from-teal-400 to-emerald-500'
-            : clampedPct >= 40
-              ? 'bg-gradient-to-r from-slate-400 to-teal-500'
-              : 'bg-gradient-to-r from-slate-300 to-slate-400'
-          }`}
+        className={`h-full rounded-full transition-all duration-700 ${
+          completed
+            ? 'bg-emerald-600'
+            : clampedPct >= 75
+              ? 'bg-emerald-500'
+              : clampedPct >= 40
+                ? 'bg-teal-500'
+                : 'bg-slate-400'
+        }`}
         style={{ width: `${clampedPct}%` }}
       />
-    </div>
-  );
-}
-
-/* ─── KPI Mini ────────────────────────────────────────────────── */
-function KpiMini({ icon: Icon, label, value, sub, accent }) {
-  const c = {
-    emerald: { wrap: 'border-emerald-100 bg-emerald-50 text-emerald-600', val: 'text-emerald-600' },
-    blue: { wrap: 'border-blue-100 bg-blue-50 text-blue-600', val: 'text-blue-600' },
-    violet: { wrap: 'border-violet-100 bg-violet-50 text-violet-600', val: 'text-violet-600' },
-    slate: { wrap: 'border-slate-200 bg-slate-50 text-slate-500', val: 'text-slate-700' },
-  }[accent] || {};
-  return (
-    <div className="card flex flex-col gap-2 py-4 items-center text-center hover:shadow-md hover:border-slate-300 transition-all duration-200">
-      <span className={`w-10 h-10 flex items-center justify-center rounded-xl border ${c.wrap}`}>
-        <Icon size={18} />
-      </span>
-      <div>
-        <p className={`text-xl font-bold ${c.val}`}>{value}</p>
-        {sub && <p className="text-xs text-slate-400 mt-0.5">{sub}</p>}
-        <p className="text-xs text-slate-500 mt-0.5">{label}</p>
-      </div>
     </div>
   );
 }
@@ -93,142 +76,140 @@ function GoalCard({ goal, onEdit, onDelete, onContribute, currency }) {
   const icon = goal.icon || CATEGORY_ICONS[goal.category] || '🎯';
 
   const toneClass = {
-    red: 'text-red-500',
-    amber: 'text-amber-500',
-    slate: 'text-slate-400',
+    red: 'text-rose-600',
+    amber: 'text-amber-600',
+    slate: 'text-slate-500',
   };
 
   if (goal.isCompleted) {
     return (
-      <div className="card border-emerald-200 bg-gradient-to-br from-emerald-50/60 to-white relative overflow-hidden">
-        {/* Completed ribbon */}
-        <div className="absolute top-3 right-3">
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 border border-emerald-200">
-            <CheckCircle size={11} /> Completed
-          </span>
-        </div>
+      <Card className="border-emerald-200/90 bg-gradient-to-br from-emerald-50/50 to-white relative overflow-hidden p-5 flex flex-col justify-between">
+        <div>
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div className="flex items-start gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 bg-emerald-50 border border-emerald-200/60 shadow-xs">
+                {icon}
+              </div>
+              <div className="min-w-0">
+                <h3 className="font-semibold text-slate-900 truncate text-sm">{goal.title}</h3>
+                <span className="text-2xs text-slate-500 capitalize">{goal.category}</span>
+              </div>
+            </div>
+            <Badge color="emerald" size="sm">
+              <CheckCircle size={11} /> 100% Achieved
+            </Badge>
+          </div>
 
-        <div className="flex items-start gap-3 pr-24">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 bg-emerald-50 border border-emerald-100">
-            {icon}
-          </div>
-          <div className="min-w-0">
-            <h3 className="font-semibold text-slate-800 truncate">{goal.title}</h3>
-            <span className="text-xs text-slate-400 capitalize">{goal.category}</span>
-          </div>
-        </div>
-
-        <div className="mt-4 space-y-2">
-          <div className="flex justify-between text-sm font-medium">
-            <span className="text-emerald-600">{fmt(goal.currentAmount, currency)}</span>
-            <span className="text-slate-400">of {fmt(goal.targetAmount, currency)}</span>
-          </div>
-          <ProgressBar pct={100} completed />
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-semibold text-emerald-600 flex items-center gap-1">
-              <Trophy size={11} /> 100% achieved
-            </span>
-            <span className="text-slate-400">{goal.contributions?.length || 0} contributions</span>
+          <div className="space-y-2 mt-4">
+            <div className="flex justify-between text-xs font-semibold">
+              <span className="text-emerald-700 tabular-nums">{fmt(goal.currentAmount, currency)}</span>
+              <span className="text-slate-400 tabular-nums font-normal">Target: {fmt(goal.targetAmount, currency)}</span>
+            </div>
+            <ProgressBar pct={100} completed />
           </div>
         </div>
 
-        <div className="mt-3 pt-3 border-t border-emerald-100 flex items-center justify-between">
-          <p className="text-xs text-emerald-600 font-medium flex items-center gap-1">
-            <CheckCircle size={12} /> Goal reached!
+        <div className="mt-4 pt-3 border-t border-emerald-100 flex items-center justify-between">
+          <p className="text-2xs text-emerald-700 font-semibold flex items-center gap-1">
+            <CheckCircle size={13} className="text-emerald-600" /> Capital Target Reached!
           </p>
           <button
             onClick={() => onDelete(goal._id)}
-            className="p-1.5 rounded-lg text-slate-300 hover:text-red-400 hover:bg-red-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
-            title="Delete"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
+            title="Delete goal"
             aria-label="Delete goal"
           >
             <Trash2 size={13} />
           </button>
         </div>
-      </div>
+      </Card>
     );
   }
 
   return (
-    <div className="card hover:shadow-md hover:border-slate-300 transition-all duration-200 group">
-      {/* Header */}
-      <div className="flex items-start gap-3">
-        <div className="w-11 h-11 rounded-xl flex items-center justify-center text-xl shrink-0 bg-slate-50 border border-slate-200">
-          {icon}
-        </div>
-        <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-slate-800 truncate">{goal.title}</h3>
-          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200 mt-1">
-            {goal.category}
-          </span>
-        </div>
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-          <button
-            onClick={() => onEdit(goal)}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
-            title="Edit"
-            aria-label="Edit goal"
-          >
-            <Pencil size={13} />
-          </button>
-          <button
-            onClick={() => onDelete(goal._id)}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
-            title="Delete"
-            aria-label="Delete goal"
-          >
-            <Trash2 size={13} />
-          </button>
-        </div>
-      </div>
-
-      {/* Amounts */}
-      <div className="mt-4 space-y-2">
-        <div className="flex items-end justify-between">
-          <div>
-            <p className="text-xl font-bold text-slate-800 leading-none">{fmt(goal.currentAmount, currency)}</p>
-            <p className="text-xs text-slate-400 mt-0.5">saved of {fmt(goal.targetAmount, currency)}</p>
+    <Card className="p-5 flex flex-col justify-between group hover:shadow-card hover:border-slate-300 transition-all duration-200">
+      <div>
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 bg-slate-50 border border-slate-200/80">
+              {icon}
+            </div>
+            <div className="min-w-0">
+              <h3 className="font-semibold text-slate-900 truncate text-sm">{goal.title}</h3>
+              <Badge color="slate" size="sm" variant="rounded" className="mt-1">
+                {goal.category}
+              </Badge>
+            </div>
           </div>
-          <div className="text-right">
-            <p className={`text-lg font-bold leading-none ${pct >= 75 ? 'text-emerald-600' : pct >= 40 ? 'text-teal-600' : 'text-slate-600'}`}>
-              {pct.toFixed(1)}%
-            </p>
-            <p className="text-xs text-slate-400 mt-0.5">achieved</p>
+          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+            <button
+              onClick={() => onEdit(goal)}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40"
+              title="Edit"
+              aria-label="Edit goal"
+            >
+              <Pencil size={13} />
+            </button>
+            <button
+              onClick={() => onDelete(goal._id)}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
+              title="Delete"
+              aria-label="Delete goal"
+            >
+              <Trash2 size={13} />
+            </button>
           </div>
         </div>
 
-        <ProgressBar pct={pct} completed={false} />
+        {/* Saved Amounts & Progress */}
+        <div className="mt-4 space-y-2">
+          <div className="flex items-end justify-between">
+            <div>
+              <p className="text-xl font-bold text-slate-900 leading-none tabular-nums">{fmt(goal.currentAmount, currency)}</p>
+              <p className="text-2xs text-slate-400 mt-1 tabular-nums">saved of {fmt(goal.targetAmount, currency)}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-base font-bold leading-none text-emerald-700 tabular-nums">
+                {pct.toFixed(1)}%
+              </p>
+              <p className="text-2xs text-slate-400 mt-1">funded</p>
+            </div>
+          </div>
 
-        <div className="flex items-center justify-between text-xs text-slate-400">
-          <span>{fmt(remaining, currency)} to go</span>
-          <span>{goal.contributions?.length || 0} contributions</span>
+          <ProgressBar pct={pct} completed={false} />
+
+          <div className="flex items-center justify-between text-2xs text-slate-500 pt-0.5">
+            <span className="tabular-nums font-medium">{fmt(remaining, currency)} remaining</span>
+            <span className="tabular-nums">{goal.contributions?.length || 0} contributions</span>
+          </div>
         </div>
       </div>
 
       {/* Footer: deadline + CTA */}
-      <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100">
-        <div className="space-y-0.5">
+      <div className="flex items-center justify-between mt-5 pt-3.5 border-t border-slate-100">
+        <div className="space-y-0.5 min-w-0 pr-2">
           {dl ? (
-            <p className={`text-xs flex items-center gap-1 font-medium ${toneClass[dl.tone]}`}>
+            <p className={`text-xs flex items-center gap-1 font-semibold ${toneClass[dl.tone]}`}>
               {dl.tone === 'red' ? <AlertCircle size={12} /> : <Clock size={12} />}
               {dl.label}
             </p>
           ) : (
-            <p className="text-xs text-slate-400 flex items-center gap-1">
-              <Clock size={12} /> No deadline
+            <p className="text-2xs text-slate-400 flex items-center gap-1">
+              <Clock size={11} /> Open-ended
             </p>
           )}
           {goal.deadline && (
-            <p className="text-[10px] text-slate-400">
-              {new Date(goal.deadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            <p className="text-2xs text-slate-400 tabular-nums">
+              Due: {new Date(goal.deadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
             </p>
           )}
         </div>
-        <Button size="sm" onClick={() => onContribute(goal)}>
-          <TrendingUp size={13} /> Contribute
+        <Button size="sm" onClick={() => onContribute(goal)} className="shrink-0">
+          <TrendingUp size={13} /> Add Funds
         </Button>
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -248,7 +229,6 @@ export default function Goals() {
   const [contribNote, setContribNote] = useState('');
   const [saving, setSaving] = useState(false);
 
-  /* ── Fetch ── */
   const fetchGoals = useCallback(async () => {
     try {
       const res = await goalsAPI.getAll();
@@ -260,54 +240,88 @@ export default function Goals() {
     }
   }, []);
 
-  useEffect(() => { fetchGoals(); }, [fetchGoals]);
+  useEffect(() => {
+    fetchGoals();
+  }, [fetchGoals]);
 
-  /* ── Create / Edit ── */
-  const openCreate = () => { setEditGoal(null); setForm(EMPTY_FORM); setModalOpen(true); };
-  const openEdit = (g) => {
-    setEditGoal(g);
-    setForm({ title: g.title, targetAmount: g.targetAmount, deadline: g.deadline?.slice(0, 10) || '', category: g.category, color: g.color || '#10b981', icon: g.icon || '🎯' });
+  const openCreate = () => {
+    setEditGoal(null);
+    setForm(EMPTY_FORM);
     setModalOpen(true);
   };
 
-  /* ── Save (validation unchanged) ── */
+  const openEdit = (g) => {
+    setEditGoal(g);
+    setForm({
+      title: g.title,
+      targetAmount: g.targetAmount,
+      deadline: g.deadline?.slice(0, 10) || '',
+      category: g.category,
+      color: g.color || '#10b981',
+      icon: g.icon || '🎯',
+    });
+    setModalOpen(true);
+  };
+
   const handleSave = async () => {
-    if (!form.title || !form.targetAmount) return toast.error('Title and target amount required.');
+    if (!form.title || !form.targetAmount) {
+      return toast.error('Title and target amount required.');
+    }
     setSaving(true);
     try {
-      if (editGoal) { await goalsAPI.update(editGoal._id, form); toast.success('Goal updated.'); }
-      else { await goalsAPI.create(form); toast.success('Goal created!'); }
+      if (editGoal) {
+        await goalsAPI.update(editGoal._id, form);
+        toast.success('Goal updated.');
+      } else {
+        await goalsAPI.create(form);
+        toast.success('Goal created!');
+      }
       setModalOpen(false);
       fetchGoals();
-    } catch (err) { toast.error(err.response?.data?.message || 'Save failed.'); }
-    finally { setSaving(false); }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Save failed.');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  /* ── Delete ── */
   const handleDelete = async (id) => {
-    if (!window.confirm('Delete this goal?')) return;
-    try { await goalsAPI.delete(id); toast.success('Goal deleted.'); fetchGoals(); }
-    catch { toast.error('Delete failed.'); }
+    if (!window.confirm('Delete this savings goal?')) return;
+    try {
+      await goalsAPI.delete(id);
+      toast.success('Goal deleted.');
+      fetchGoals();
+    } catch {
+      toast.error('Delete failed.');
+    }
   };
 
-  /* ── Contribute ── */
-  const openContrib = (goal) => { setSelectedGoal(goal); setContribAmount(''); setContribNote(''); setContribModal(true); };
+  const openContrib = (goal) => {
+    setSelectedGoal(goal);
+    setContribAmount('');
+    setContribNote('');
+    setContribModal(true);
+  };
 
   const handleContribute = async () => {
-    if (!contribAmount || Number(contribAmount) <= 0) return toast.error('Enter a valid amount.');
+    if (!contribAmount || Number(contribAmount) <= 0) {
+      return toast.error('Enter a valid contribution amount.');
+    }
     setSaving(true);
     try {
       await goalsAPI.contribute(selectedGoal._id, { amount: Number(contribAmount), note: contribNote });
       toast.success(`${fmt(contribAmount, user?.currency)} added to "${selectedGoal.title}"!`);
       setContribModal(false);
       fetchGoals();
-    } catch (err) { toast.error(err.response?.data?.message || 'Contribution failed.'); }
-    finally { setSaving(false); }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Contribution failed.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const setF = (f) => (e) => setForm({ ...form, [f]: e.target.value });
 
-  /* ── Derived ── */
   const active = goals.filter((g) => !g.isCompleted);
   const completed = goals.filter((g) => g.isCompleted);
   const displayed = tab === 'active' ? active : completed;
@@ -315,93 +329,116 @@ export default function Goals() {
   const totalTarget = active.reduce((s, g) => s + g.targetAmount, 0);
   const overallPct = totalTarget > 0 ? Math.round((totalSaved / totalTarget) * 100) : 0;
 
-  /* ── Contribution preview ── */
   const contribNum = Number(contribAmount) || 0;
   const newAmount = selectedGoal ? Math.min(selectedGoal.currentAmount + contribNum, selectedGoal.targetAmount) : 0;
   const newRemaining = selectedGoal ? Math.max(selectedGoal.targetAmount - newAmount, 0) : 0;
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 gap-3">
-        <Spinner size="lg" />
-        <p className="text-sm text-slate-400">Loading goals…</p>
+      <div className="space-y-6 animate-fade-in">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2">
+          <div className="space-y-2">
+            <div className="h-8 w-56 bg-slate-200/70 rounded-xl animate-pulse" />
+            <div className="h-4 w-96 bg-slate-100 rounded-lg animate-pulse" />
+          </div>
+          <div className="h-9 w-32 bg-slate-200/70 rounded-xl animate-pulse" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <StatCardSkeleton key={i} />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <CardSkeleton key={i} height="h-60" />
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6 animate-fade-in">
-
-      {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Savings Goals</h1>
-          <p className="text-sm text-slate-500 mt-0.5 flex items-center gap-1.5">
-            <Sparkles size={13} className="text-amber-400" />
-            Every contribution brings you closer to financial freedom.
-          </p>
-        </div>
-        <Button onClick={openCreate} className="self-start sm:self-auto shrink-0">
-          <Plus size={16} /> Create Goal
+      {/* Header */}
+      <PageHeader
+        title="Capital Savings Goals"
+        description="Structured milestone targets with continuous contribution tracking."
+      >
+        <Button onClick={openCreate} size="sm">
+          <Plus size={15} /> Create Goal
         </Button>
-      </div>
+      </PageHeader>
 
-      {/* ── KPI Strip ── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <KpiMini icon={Target} label="Active Goals" value={active.length} accent="emerald" />
-        <KpiMini
-          icon={PiggyBank}
-          label="Total Saved"
-          value={fmt(totalSaved, user?.currency)}
-          sub={`${overallPct}% of target`}
-          accent="blue"
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <StatCard
+          icon={Target}
+          label="Active Goals"
+          value={<span className="tabular-nums">{active.length}</span>}
+          color="emerald"
         />
-        <KpiMini icon={Trophy} label="Completed" value={completed.length} accent="violet" />
+        <StatCard
+          icon={PiggyBank}
+          label="Total Capital Saved"
+          value={<span className="tabular-nums">{fmt(totalSaved, user?.currency)}</span>}
+          sub={<span className="tabular-nums">{overallPct}% of target funded</span>}
+          color="blue"
+        />
+        <StatCard
+          icon={Trophy}
+          label="Fully Funded Goals"
+          value={<span className="tabular-nums">{completed.length}</span>}
+          color="violet"
+        />
       </div>
 
-      {/* ── Segmented Tabs ── */}
-      <div className="inline-flex items-center gap-1 bg-slate-100 border border-slate-200 p-1 rounded-xl">
+      {/* Segmented Filter Pills */}
+      <div className="inline-flex items-center gap-1 bg-slate-100 border border-slate-200/90 p-1 rounded-xl">
         {[
-          { key: 'active', label: 'Active', count: active.length },
+          { key: 'active', label: 'Active Targets', count: active.length },
           { key: 'completed', label: 'Completed', count: completed.length },
         ].map(({ key, label, count }) => (
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200
-              ${tab === key
-                ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
-                : 'text-slate-500 hover:text-slate-700'}`}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40
+              ${
+                tab === key
+                  ? 'bg-white text-slate-900 shadow-xs border border-slate-200/80'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
           >
             {label}
-            <span className={`ml-1.5 text-xs font-semibold px-1.5 py-0.5 rounded-full
-              ${tab === key ? 'bg-slate-100 text-slate-600' : 'bg-slate-200/60 text-slate-400'}`}>
+            <span
+              className={`ml-1.5 text-2xs font-bold px-1.5 py-0.5 rounded-full tabular-nums
+              ${tab === key ? 'bg-slate-100 text-slate-700' : 'bg-slate-200/60 text-slate-500'}`}
+            >
               {count}
             </span>
           </button>
         ))}
       </div>
 
-      {/* ── Goals Grid ── */}
+      {/* Goals Grid */}
       {displayed.length === 0 ? (
-        <div className="card flex flex-col items-center justify-center py-20 gap-4 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center">
-            <Target size={28} className="text-slate-300" />
+        <Card className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-center">
+            <Target size={26} className="text-slate-300" />
           </div>
           <div>
-            <h3 className="font-semibold text-slate-700">
-              {tab === 'active' ? 'No active goals' : 'No completed goals yet'}
+            <h3 className="font-semibold text-slate-800 text-sm">
+              {tab === 'active' ? 'No active goals in progress' : 'No completed goals yet'}
             </h3>
-            <p className="text-sm text-slate-400 mt-1">
+            <p className="text-xs text-slate-400 mt-0.5">
               {tab === 'active'
-                ? 'Set a savings target and start working toward it.'
-                : 'Keep contributing — completed goals will appear here.'}
+                ? 'Establish a target fund for travel, emergencies, or large investments.'
+                : 'Keep contributing — completed goals automatically archive here.'}
             </p>
           </div>
           {tab === 'active' && (
             <Button onClick={openCreate} size="sm"><Plus size={14} /> Create Goal</Button>
           )}
-        </div>
+        </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {displayed.map((g) => (
@@ -417,133 +454,136 @@ export default function Goals() {
         </div>
       )}
 
-      {/* ── Create / Edit Modal ── */}
-      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editGoal ? 'Edit Goal' : 'New Goal'}>
+      {/* Create / Edit Modal */}
+      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editGoal ? 'Edit Goal' : 'Create Savings Goal'}>
         <div className="space-y-4">
-
-          {/* Title + Target */}
-          <Input label="Goal title" placeholder="e.g. Emergency Fund" value={form.title} onChange={setF('title')} />
+          <Input
+            label="Goal title"
+            placeholder="e.g. 6-Month Emergency Reserve"
+            value={form.title}
+            onChange={setF('title')}
+            disabled={saving}
+          />
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-slate-700">Target amount</label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
-                <input
-                  type="number" min="1" placeholder="5,000"
-                  value={form.targetAmount}
-                  onChange={setF('targetAmount')}
-                  className="input-field pl-7"
-                />
-              </div>
-            </div>
-            <Input label="Deadline (optional)" type="date" value={form.deadline} onChange={setF('deadline')} />
+            <Input
+              label="Target amount ($)"
+              type="number"
+              min="1"
+              placeholder="10,000.00"
+              value={form.targetAmount}
+              onChange={setF('targetAmount')}
+              disabled={saving}
+            />
+            <Input
+              label="Target Deadline"
+              type="date"
+              value={form.deadline}
+              onChange={setF('deadline')}
+              disabled={saving}
+            />
           </div>
 
-          <Select label="Category" value={form.category} onChange={setF('category')}>
+          <Select label="Category" value={form.category} onChange={setF('category')} disabled={saving}>
             {GOAL_CATEGORIES.map((c) => (
               <option key={c} value={c}>{CATEGORY_ICONS[c]} {c}</option>
             ))}
           </Select>
 
           <div className="flex gap-3 items-end">
-            <Input label="Icon (emoji)" placeholder="🎯" value={form.icon} onChange={setF('icon')} className="flex-1" />
+            <Input
+              label="Icon (emoji)"
+              placeholder="🎯"
+              value={form.icon}
+              onChange={setF('icon')}
+              className="flex-1"
+              disabled={saving}
+            />
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-slate-700">Color</label>
+              <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Color</label>
               <input
-                type="color" value={form.color} onChange={setF('color')}
-                className="h-10 w-14 rounded-xl border border-slate-200 p-1 bg-white cursor-pointer"
+                type="color"
+                value={form.color}
+                onChange={setF('color')}
+                disabled={saving}
+                className="h-10 w-14 rounded-xl border border-slate-200 p-1 bg-white cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40"
               />
             </div>
           </div>
 
-          {/* Live preview */}
-          {form.title && form.targetAmount && (
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
-              <span className="text-2xl">{form.icon}</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-slate-700 truncate">{form.title}</p>
-                <p className="text-xs text-slate-400">{form.category} · Target {fmt(form.targetAmount, user?.currency)}</p>
-              </div>
-            </div>
-          )}
-
-          <div className="flex gap-3 pt-1">
-            <Button variant="secondary" className="flex-1" onClick={() => setModalOpen(false)} disabled={saving}>Cancel</Button>
+          <div className="flex gap-2.5 pt-2">
+            <Button variant="secondary" className="flex-1" onClick={() => setModalOpen(false)} disabled={saving}>
+              Cancel
+            </Button>
             <Button className="flex-1" loading={saving} onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving…' : editGoal ? 'Save Changes' : 'Create Goal'}
+              {saving ? 'Saving...' : editGoal ? 'Save Updates' : 'Create Goal'}
             </Button>
           </div>
         </div>
       </Modal>
 
-      {/* ── Contribution Modal ── */}
+      {/* Contribution Modal */}
       <Modal
         isOpen={contribModal}
         onClose={() => setContribModal(false)}
-        title={`Contribute to "${selectedGoal?.title}"`}
+        title={`Add Funds to "${selectedGoal?.title}"`}
         size="sm"
       >
         <div className="space-y-4">
           {selectedGoal && (
             <>
-              {/* Progress snapshot */}
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">Current saved</span>
-                  <span className="font-semibold text-slate-700">{fmt(selectedGoal.currentAmount, user?.currency)}</span>
+              <div className="space-y-2 p-3 bg-slate-50/80 rounded-xl border border-slate-200/80 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-slate-500 font-medium">Current saved</span>
+                  <span className="font-bold text-slate-900 tabular-nums">{fmt(selectedGoal.currentAmount, user?.currency)}</span>
                 </div>
                 <ProgressBar
                   pct={Math.min((selectedGoal.currentAmount / selectedGoal.targetAmount) * 100, 100)}
                   completed={false}
                 />
-                <div className="flex justify-between text-xs text-slate-400">
-                  <span>{fmt(selectedGoal.targetAmount - selectedGoal.currentAmount, user?.currency)} remaining</span>
-                  <span>of {fmt(selectedGoal.targetAmount, user?.currency)}</span>
-                </div>
-              </div>
-
-              <div className="h-px bg-slate-100" />
-
-              {/* Amount input */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-slate-700">Contribution amount</label>
-                <div className="relative">
-                  <DollarSign size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="number" min="0.01" placeholder="100"
-                    value={contribAmount}
-                    onChange={(e) => setContribAmount(e.target.value)}
-                    className="input-field pl-8"
-                    autoFocus
-                  />
+                <div className="flex justify-between text-2xs text-slate-400">
+                  <span className="tabular-nums font-medium text-emerald-700">
+                    {fmt(selectedGoal.targetAmount - selectedGoal.currentAmount, user?.currency)} remaining
+                  </span>
+                  <span className="tabular-nums">of {fmt(selectedGoal.targetAmount, user?.currency)}</span>
                 </div>
               </div>
 
               <Input
-                label="Note (optional)"
-                placeholder="e.g. Monthly savings"
-                value={contribNote}
-                onChange={(e) => setContribNote(e.target.value)}
+                label="Contribution amount ($)"
+                type="number"
+                min="0.01"
+                placeholder="250.00"
+                value={contribAmount}
+                onChange={(e) => setContribAmount(e.target.value)}
+                disabled={saving}
+                autoFocus
               />
 
-              {/* Live projection */}
+              <Input
+                label="Note (optional)"
+                placeholder="e.g. Dividend reinvestment"
+                value={contribNote}
+                onChange={(e) => setContribNote(e.target.value)}
+                disabled={saving}
+              />
+
               {contribNum > 0 && (
-                <div className="space-y-2 p-3 rounded-xl bg-emerald-50 border border-emerald-100">
-                  <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">After contribution</p>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-600">New total</span>
-                    <span className="font-bold text-emerald-700">{fmt(newAmount, user?.currency)}</span>
+                <div className="space-y-2 p-3 rounded-xl bg-emerald-50 border border-emerald-200/80 animate-fade-in text-xs">
+                  <p className="text-2xs font-bold text-emerald-800 uppercase tracking-wider">Projected Total</p>
+                  <div className="flex justify-between">
+                    <span className="text-slate-600">New Funded Amount</span>
+                    <span className="font-bold text-emerald-800 tabular-nums">{fmt(newAmount, user?.currency)}</span>
                   </div>
                   <ProgressBar
                     pct={Math.min((newAmount / selectedGoal.targetAmount) * 100, 100)}
                     completed={newAmount >= selectedGoal.targetAmount}
                   />
                   {newRemaining > 0 ? (
-                    <p className="text-xs text-slate-500">{fmt(newRemaining, user?.currency)} still remaining</p>
+                    <p className="text-2xs text-slate-500 tabular-nums">{fmt(newRemaining, user?.currency)} still remaining</p>
                   ) : (
-                    <p className="text-xs text-emerald-600 font-medium flex items-center gap-1">
-                      <CheckCircle size={12} /> Goal will be completed!
+                    <p className="text-2xs text-emerald-700 font-semibold flex items-center gap-1">
+                      <CheckCircle size={13} /> Target reached with this contribution!
                     </p>
                   )}
                 </div>
@@ -551,10 +591,17 @@ export default function Goals() {
             </>
           )}
 
-          <div className="flex gap-3 pt-1">
-            <Button variant="secondary" className="flex-1" onClick={() => setContribModal(false)} disabled={saving}>Cancel</Button>
-            <Button className="flex-1" loading={saving} onClick={handleContribute} disabled={saving || contribNum <= 0}>
-              {saving ? 'Saving…' : 'Add Contribution'}
+          <div className="flex gap-2.5 pt-2">
+            <Button variant="secondary" className="flex-1" onClick={() => setContribModal(false)} disabled={saving}>
+              Cancel
+            </Button>
+            <Button
+              className="flex-1"
+              loading={saving}
+              onClick={handleContribute}
+              disabled={saving || contribNum <= 0}
+            >
+              {saving ? 'Processing...' : 'Confirm Contribution'}
             </Button>
           </div>
         </div>
