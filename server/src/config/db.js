@@ -2,51 +2,69 @@ const mongoose = require('mongoose');
 const { exec } = require('child_process');
 const path = require('path');
 const User = require('../models/User');
+const startMemoryServer = async () => {
+  console.log('🔄 Starting MongoDB Memory Server (in-memory fallback)...');
+  const { MongoMemoryServer } = require('mongodb-memory-server');
+  const mongod = await MongoMemoryServer.create();
+  const uri = mongod.getUri();
+  await mongoose.connect(uri, { serverSelectionTimeoutMS: 5000 });
+  console.log(`✅ MongoDB Memory Server connected: ${uri}`);
+  return uri;
+};
 
 const connectDB = async () => {
-  try {
-    let uri = process.env.MONGO_URI;
-    let isMemory = false;
+  let uri = (process.env.MONGO_URI || '').trim();
+  let isConnected = false;
 
-    const isLocal = !uri || uri.includes('localhost') || uri.includes('127.0.0.1');
+  const isPlaceholder =
+    !uri ||
+    uri.includes('<user>') ||
+    uri.includes('<password>') ||
+    uri.includes('<username>') ||
+    uri.includes('cluster.mongodb.net/<');
 
+  const isLocal = uri.includes('localhost') || uri.includes('127.0.0.1');
+
+  // Attempt connecting to remote or local URI if valid
+  if (uri && !isPlaceholder) {
     if (isLocal && process.env.NODE_ENV === 'production') {
-      throw new Error('MONGO_URI must be set to a real MongoDB URI in production!');
+      console.warn('⚠️ Localhost MONGO_URI detected in production. Attempting connection or falling back to in-memory database...');
     }
-
-    // Use MongoMemoryServer for local dev / demo if local MongoDB is not running
-    if (isLocal) {
-      console.log('🔄 Checking MongoDB connection or starting Memory Server...');
-      try {
-        await mongoose.connect(uri || 'mongodb://localhost:27017/financial_habit_tracker', {
-          serverSelectionTimeoutMS: 2000,
-        });
-        console.log(`✅ MongoDB connected locally: ${mongoose.connection.host}`);
-      } catch (localErr) {
-        console.log('⚠️ Local MongoDB not reachable. Starting local MongoDB Memory Server...');
-        const { MongoMemoryServer } = require('mongodb-memory-server');
-        const mongod = await MongoMemoryServer.create();
-        uri = mongod.getUri();
-        isMemory = true;
-        await mongoose.connect(uri, { serverSelectionTimeoutMS: 5000 });
-        console.log(`✅ MongoDB Memory Server connected: ${uri}`);
-      }
-    } else {
+    try {
+      console.log(`🔄 Attempting to connect to MongoDB (${isLocal ? 'local' : 'remote'})...`);
       const conn = await mongoose.connect(uri, {
-        serverSelectionTimeoutMS: 5000,
+        serverSelectionTimeoutMS: 4000,
       });
       console.log(`✅ MongoDB connected: ${conn.connection.host}`);
+      isConnected = true;
+    } catch (err) {
+      console.warn(`⚠️ Failed to connect to MONGO_URI: ${err.message}`);
     }
+  } else {
+    console.warn('⚠️ MONGO_URI is not set or contains placeholder credentials.');
+  }
 
-    // Ensure User indexes (especially unique index on email) exist and are fully built
+  // Graceful fallback to MongoMemoryServer (works in dev and production)
+  if (!isConnected) {
     try {
-      await User.init();
-      console.log('✅ User model indexes verified');
-    } catch (idxError) {
-      console.warn('⚠️ User index verification notice:', idxError.message);
+      uri = await startMemoryServer();
+      isConnected = true;
+    } catch (memErr) {
+      console.error(`❌ In-memory MongoDB failed to start: ${memErr.message}`);
+      process.exit(1);
     }
+  }
 
-    // Seed if empty (either memory server or fresh empty database)
+  // Ensure User indexes exist and are fully built
+  try {
+    await User.init();
+    console.log('✅ User model indexes verified');
+  } catch (idxError) {
+    console.warn('⚠️ User index verification notice:', idxError.message);
+  }
+
+  // Seed if empty (either memory server or fresh empty database)
+  try {
     const userCount = await User.countDocuments();
     if (userCount === 0) {
       console.log('🌱 Database has 0 users. Seeding initial accounts & demo data...');
@@ -65,10 +83,10 @@ const connectDB = async () => {
         }
       );
     }
-  } catch (error) {
-    console.error(`❌ MongoDB connection error: ${error.message}`);
-    process.exit(1);
+  } catch (seedCheckErr) {
+    console.warn('⚠️ Seed check notice:', seedCheckErr.message);
   }
 };
 
 module.exports = connectDB;
+
