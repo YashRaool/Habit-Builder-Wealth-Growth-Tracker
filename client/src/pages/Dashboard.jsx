@@ -1,657 +1,799 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  TrendingUp, TrendingDown, DollarSign, Target, Flame,
-  Plus, ArrowLeftRight, Wallet, CheckCircle, Circle, Activity,
-  Calendar, ChevronRight
-} from 'lucide-react';
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend,
-} from 'recharts';
-import { transactionsAPI } from '../api/transactions';
-import { habitsAPI } from '../api/habits';
-import { wealthAPI } from '../api/wealth';
-import { goalsAPI } from '../api/goals';
-import { useAuth } from '../context/AuthContext';
-import { useToast } from '../context/ToastContext';
-import Card, { StatCard } from '../components/ui/Card';
-import Spinner from '../components/ui/Spinner';
-import Button from '../components/ui/Button';
-import PageHeader from '../components/layout/PageHeader';
-import Modal from '../components/ui/Modal';
-import Input from '../components/ui/Input';
-import Badge from '../components/ui/Badge';
-import { StatCardSkeleton, ChartSkeleton, CardSkeleton, TableSkeleton } from '../components/ui/Skeleton';
+import { api } from '@/lib/api';
+import Card from '@/components/Card';
+import StreakGauge from '@/components/StreakGauge';
 
-const PIE_COLORS = ['#10b981', '#6366f1', '#f59e0b', '#f43f5e', '#0ea5e9', '#8b5cf6', '#ec4899', '#14b8a6'];
-
-const fmt = (n, currency = 'USD') =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(n);
-
-const CATEGORY_ICONS = {
-  'Emergency Fund': '🛡️', 'Travel': '✈️', 'Home': '🏠', 'Education': '🎓',
-  'Vehicle': '🚗', 'Retirement': '🏖️', 'Electronics': '💻', 'Wedding': '💍', 'Other': '🎯',
+const fmt = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n ?? 0);
+const todayStr = () => {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+};
+const curMonthStr = () => {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`;
 };
 
-const CustomTooltip = ({ active, payload, label }) => {
-  if (!active || !payload?.length) return null;
+const EXPENSE_CATEGORIES = [
+  'Rent', 'Groceries', 'Dining Out', 'Transport', 'Subscriptions',
+  'Entertainment', 'Healthcare', 'Shopping', 'Utilities', 'Savings Transfer', 'Other',
+];
+
+const INCOME_SOURCES = [
+  'Salary', 'Freelance', 'Side hustle', 'Bonus', 'Investment return', 'Gift', 'Other',
+];
+
+const INVESTMENT_TYPES = [
+  { value: 'cash',       label: 'Cash / Savings' },
+  { value: 'investment', label: 'Stocks / Funds' },
+  { value: 'asset',      label: 'Real Estate / Assets' },
+];
+
+/* ─── Generic Modal Container ─── */
+function Modal({ open, onClose, children }) {
+  useEffect(() => {
+    if (!open) return;
+    const esc = (e) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, [open, onClose]);
+
+  if (!open) return null;
   return (
-    <div className="bg-white/95 backdrop-blur-sm border border-slate-200/90 rounded-xl p-3 text-xs shadow-elevated animate-fade-in min-w-[140px]">
-      <p className="font-semibold text-slate-900 mb-1.5 pb-1 border-b border-slate-100">{label}</p>
-      <div className="space-y-1">
-        {payload.map((p) => (
-          <div key={p.dataKey || p.name} className="flex items-center justify-between gap-3">
-            <span className="flex items-center gap-1.5 text-slate-500">
-              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: p.color || p.fill }} />
-              {p.name}
-            </span>
-            <span className="font-bold tabular-nums text-slate-900">{fmt(p.value)}</span>
-          </div>
-        ))}
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+      style={{ background: 'rgba(22,24,29,0.5)', backdropFilter: 'blur(4px)' }}
+      onClick={onClose}
+    >
+      <div className="w-full max-w-md animate-fade-in" onClick={(e) => e.stopPropagation()}>
+        {children}
       </div>
     </div>
   );
-};
+}
 
-export default function Dashboard() {
-  const { user } = useAuth();
-  const toast = useToast();
-  const [loading, setLoading] = useState(true);
-  const [summary, setSummary] = useState([]);
-  const [habits, setHabits] = useState([]);
-  const [netWorth, setNetWorth] = useState(null);
-  const [recentTx, setRecentTx] = useState([]);
-  const [goals, setGoals] = useState([]);
-  
-  const [checkingIn, setCheckingIn] = useState(null);
-  
-  const [contribModal, setContribModal] = useState(false);
-  const [selectedGoal, setSelectedGoal] = useState(null);
-  const [contribAmount, setContribAmount] = useState('');
-  const [contribNote, setContribNote] = useState('');
-  const [savingGoal, setSavingGoal] = useState(false);
+/* ─── Quick Add Record Form ─── */
+function QuickRecordModal({ type, open, onClose, onSuccess }) {
+  const isExpense = type === 'expense';
+  const [category, setCategory] = useState(isExpense ? EXPENSE_CATEGORIES[0] : INCOME_SOURCES[0]);
+  const [amount, setAmount] = useState('');
+  const [date, setDate] = useState(todayStr());
+  const [note, setNote] = useState('');
+  const [errors, setErrors] = useState([]);
+  const [busy, setBusy] = useState(false);
 
-  const fetchData = async () => {
+  useEffect(() => {
+    if (open) {
+      setCategory(isExpense ? EXPENSE_CATEGORIES[0] : INCOME_SOURCES[0]);
+      setAmount('');
+      setDate(todayStr());
+      setNote('');
+      setErrors([]);
+    }
+  }, [open, isExpense]);
+
+  async function submit(e) {
+    e.preventDefault();
+    const errs = [];
+    if (!amount || Number(amount) <= 0) errs.push('Amount must be positive');
+    if (!date) errs.push('Date is required');
+    if (errs.length) {
+      setErrors(errs);
+      return;
+    }
+    setBusy(true);
     try {
-      const [sumRes, habRes, nwRes, txRes, goalRes] = await Promise.all([
-        transactionsAPI.getSummary({ months: 6 }),
-        habitsAPI.getAll({ isActive: true }),
-        wealthAPI.getNetWorth(),
-        transactionsAPI.getAll({ limit: 8, sort: '-date' }),
-        goalsAPI.getAll()
+      const endpoint = isExpense ? '/expenses' : '/income';
+      const body = isExpense
+        ? { category, amount: Number(amount), date, note }
+        : { source: category, amount: Number(amount), date, note };
+      await api.post(endpoint, body);
+      onSuccess();
+      onClose();
+    } catch (err) {
+      setErrors(err.errors || [err.error || 'Save failed']);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const inputCls = 'w-full rounded-xl px-3 py-2.5 text-sm outline-none transition-all';
+  const inputSt = { background: 'var(--canvas)', border: '1.5px solid var(--border)', color: 'var(--ink)' };
+  const options = isExpense ? EXPENSE_CATEGORIES : INCOME_SOURCES;
+
+  return (
+    <Modal open={open} onClose={onClose}>
+      <Card padding="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-bold text-base" style={{ color: 'var(--ink)' }}>
+            Quick Add {isExpense ? 'Expense' : 'Income'}
+          </h2>
+          <button onClick={onClose} className="text-xl leading-none" style={{ color: 'var(--muted)' }} aria-label="Close">
+            ×
+          </button>
+        </div>
+
+        <form onSubmit={submit} noValidate className="flex flex-col gap-3">
+          <div>
+            <p className="text-label mb-1">{isExpense ? 'Category' : 'Source'}</p>
+            <select value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls} style={inputSt}>
+              {options.map((o) => (
+                <option key={o}>{o}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-label mb-1">Amount ($)</p>
+              <input
+                type="number"
+                min="0.01"
+                step="0.01"
+                placeholder="0.00"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className={inputCls}
+                style={inputSt}
+              />
+            </div>
+            <div>
+              <p className="text-label mb-1">Date</p>
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} style={inputSt} />
+            </div>
+          </div>
+
+          <div>
+            <p className="text-label mb-1">Note (optional)</p>
+            <input
+              type="text"
+              placeholder="Brief description"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              className={inputCls}
+              style={inputSt}
+            />
+          </div>
+
+          {errors.length > 0 && (
+            <ul className="text-xs rounded-lg p-3" style={{ background: 'rgba(226,87,76,0.08)', color: 'var(--rose)' }}>
+              {errors.map((err, i) => (
+                <li key={i}>• {err}</li>
+              ))}
+            </ul>
+          )}
+
+          <button
+            type="submit"
+            disabled={busy}
+            className="w-full py-2.5 rounded-xl font-semibold text-white text-sm mt-1 transition-all"
+            style={{ background: busy ? 'var(--muted)' : isExpense ? 'var(--rose)' : 'var(--mint)' }}
+          >
+            {busy ? 'Saving…' : `Save ${isExpense ? 'Expense' : 'Income'}`}
+          </button>
+        </form>
+      </Card>
+    </Modal>
+  );
+}
+
+/* ─── Add Investment Modal ─── */
+function AddInvestmentModal({ open, onClose, onSuccess }) {
+  const [type, setType]     = useState(INVESTMENT_TYPES[0].value);
+  const [name, setName]     = useState('');
+  const [value, setValue]   = useState('');
+  const [errors, setErrors] = useState([]);
+  const [busy, setBusy]     = useState(false);
+
+  useEffect(() => {
+    if (open) { setType(INVESTMENT_TYPES[0].value); setName(''); setValue(''); setErrors([]); }
+  }, [open]);
+
+  async function submit(e) {
+    e.preventDefault();
+    const errs = [];
+    if (!name.trim()) errs.push('Name is required');
+    if (!value || Number(value) <= 0) errs.push('Value must be positive');
+    if (errs.length) { setErrors(errs); return; }
+    setBusy(true);
+    try {
+      await api.post('/investments', { type, name: name.trim(), value: Number(value) });
+      onSuccess();
+      onClose();
+    } catch (err) {
+      setErrors(err.errors || [err.error || 'Save failed']);
+    } finally { setBusy(false); }
+  }
+
+  const inputCls = 'w-full rounded-xl px-3 py-2.5 text-sm outline-none transition-all';
+  const inputSt  = { background: 'var(--canvas)', border: '1.5px solid var(--border)', color: 'var(--ink)' };
+
+  return (
+    <Modal open={open} onClose={onClose}>
+      <Card padding="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-bold text-base" style={{ color: 'var(--ink)' }}>
+            Add Investment / Asset
+          </h2>
+          <button onClick={onClose} className="text-xl leading-none" style={{ color: 'var(--muted)' }} aria-label="Close">
+            ×
+          </button>
+        </div>
+
+        <form onSubmit={submit} noValidate className="flex flex-col gap-3">
+          <div>
+            <p className="text-label mb-1">Type</p>
+            <select value={type} onChange={(e) => setType(e.target.value)} className={inputCls} style={inputSt}>
+              {INVESTMENT_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <p className="text-label mb-1">Name / Label</p>
+            <input
+              type="text"
+              placeholder="e.g. S&P 500 Index Fund"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className={inputCls}
+              style={inputSt}
+            />
+          </div>
+
+          <div>
+            <p className="text-label mb-1">Value ($)</p>
+            <input
+              type="number"
+              min="0.01"
+              step="0.01"
+              placeholder="0.00"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              className={inputCls}
+              style={inputSt}
+            />
+          </div>
+
+          {errors.length > 0 && (
+            <ul className="text-xs rounded-lg p-3" style={{ background: 'rgba(226,87,76,0.08)', color: 'var(--rose)' }}>
+              {errors.map((err, i) => (
+                <li key={i}>• {err}</li>
+              ))}
+            </ul>
+          )}
+
+          <button
+            type="submit"
+            disabled={busy}
+            className="w-full py-2.5 rounded-xl font-semibold text-white text-sm mt-1 transition-all"
+            style={{ background: busy ? 'var(--muted)' : 'var(--coral)' }}
+          >
+            {busy ? 'Saving…' : 'Save Investment'}
+          </button>
+        </form>
+      </Card>
+    </Modal>
+  );
+}
+
+/* ─── Quick Deposit Modal for Savings Goals ─── */
+function QuickDepositModal({ goal, open, onClose, onSuccess }) {
+  const [amount, setAmount] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (open) {
+      setAmount('');
+      setError('');
+    }
+  }, [open]);
+
+  if (!goal) return null;
+
+  const remaining = Math.max(0, (goal.target_amount || 0) - (goal.current_amount || 0));
+
+  async function submit(e) {
+    e.preventDefault();
+    const val = Number(amount);
+    if (!amount || val <= 0) {
+      setError('Amount must be positive');
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.patch(`/goals/${goal.id}/deposit`, { amount: val });
+      onSuccess();
+      onClose();
+    } catch (err) {
+      setError(err.errors?.[0] || 'Deposit failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const inputCls = 'w-full rounded-xl px-3 py-2.5 text-sm outline-none';
+  const inputSt = { background: 'var(--canvas)', border: '1.5px solid var(--border)', color: 'var(--ink)' };
+
+  return (
+    <Modal open={open} onClose={onClose}>
+      <Card padding="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-bold text-base" style={{ color: 'var(--ink)' }}>
+            Add deposit to {goal.name}
+          </h2>
+          <button onClick={onClose} className="text-xl leading-none" style={{ color: 'var(--muted)' }} aria-label="Close">
+            ×
+          </button>
+        </div>
+
+        <form onSubmit={submit} noValidate className="flex flex-col gap-3">
+          <p className="text-xs" style={{ color: 'var(--muted)' }}>
+            Target: {fmt(goal.target_amount)} | Saved: {fmt(goal.current_amount)} | Remaining: {fmt(remaining)}
+          </p>
+
+          <div>
+            <p className="text-label mb-1">Deposit amount ($)</p>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              autoFocus
+              placeholder="e.g. 250"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className={inputCls}
+              style={inputSt}
+            />
+          </div>
+
+          {error && <p className="text-xs" style={{ color: 'var(--rose)' }}>• {error}</p>}
+
+          <button
+            type="submit"
+            disabled={busy}
+            className="w-full py-2.5 rounded-xl font-semibold text-white text-sm mt-1 transition-all"
+            style={{ background: busy ? 'var(--muted)' : 'var(--coral)' }}
+          >
+            {busy ? 'Processing…' : 'Add to savings'}
+          </button>
+        </form>
+      </Card>
+    </Modal>
+  );
+}
+
+/* ───────────────────────────────────────────
+   Main Dashboard Component
+─────────────────────────────────────────── */
+export default function Dashboard() {
+  const [history, setHistory] = useState([]);
+  const [breakdown, setBreakdown] = useState(null);
+  const [incomeList, setIncomeList] = useState([]);
+  const [expenseList, setExpenseList] = useState([]);
+  const [habits, setHabits] = useState([]);
+  const [habitLogs, setHabitLogs] = useState({});
+  const [goals, setGoals] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Modals state
+  const [quickModal, setQuickModal] = useState(null); // 'expense' | 'income' | null
+  const [depositGoal, setDepositGoal] = useState(null); // goal object | null
+  const [checkingHabitId, setCheckingHabitId] = useState(null);
+  const [showInvestModal, setShowInvestModal] = useState(false);
+
+  /* ── Fetch summary data from all tasks ── */
+  const fetchAllData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [histRes, bdRes, incRes, expRes, habRes, goalRes] = await Promise.all([
+        api.get('/analytics/net-worth-history?months=6'),
+        api.get('/analytics/breakdown'),
+        api.get('/income?limit=200'),
+        api.get('/expenses?limit=200'),
+        api.get('/habits'),
+        api.get('/goals'),
       ]);
-      setSummary(sumRes.data.data.summary);
-      setHabits(habRes.data.data.habits);
-      setNetWorth(nwRes.data.data);
-      setRecentTx(txRes.data.data);
-      setGoals(goalRes.data.data.goals.filter(g => !g.isCompleted));
+
+      setHistory(histRes || []);
+      setBreakdown(bdRes || null);
+      setIncomeList(incRes.data || []);
+      setExpenseList(expRes.data || []);
+      setHabits(habRes || []);
+      setGoals(goalRes || []);
+
+      // Fetch logs for habits for today's checkin status
+      if (Array.isArray(habRes) && habRes.length > 0) {
+        const logEntries = await Promise.all(
+          habRes.map(async (h) => {
+            try {
+              const logs = await api.get(`/habits/${h.id}/logs?days=30`);
+              return [h.id, logs];
+            } catch {
+              return [h.id, []];
+            }
+          })
+        );
+        setHabitLogs(Object.fromEntries(logEntries));
+      } else {
+        setHabitLogs({});
+      }
     } catch {
-      toast.error('Failed to load dashboard data.');
+      /* silent retry or handle */
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchData();
   }, []);
 
-  const handleCheckIn = async (habit) => {
-    const today = new Date().toDateString();
-    const checkedToday = habit.logs?.some((l) => new Date(l.date).toDateString() === today && l.completed);
-    setCheckingIn(habit._id);
+  useEffect(() => {
+    fetchAllData();
+  }, [fetchAllData]);
+
+  /* ── Net Worth Calculations (Matches Analytics & Tracker) ── */
+  /* ── Net Worth Calculations (Matches Analytics & Tracker) ── */
+  const latestNW = history.length > 0 ? Number(history[history.length - 1].net_worth) : 0;
+  const prevNW = history.length > 1 ? Number(history[history.length - 2].net_worth) : null;
+  const nwDelta = (prevNW !== null && prevNW !== 0) 
+    ? (((latestNW - prevNW) / Math.abs(prevNW)) * 100).toFixed(1) 
+    : null;
+
+  /* ── Income vs. Expenses This Month (Matches Tracker) ── */
+  const curM = curMonthStr();
+  const currentMonthIncome = useMemo(
+    () =>
+      incomeList
+        .filter((r) => r.date?.toString().slice(0, 7) === curM)
+        .reduce((s, r) => s + Number(r.amount), 0),
+    [incomeList, curM]
+  );
+
+  const currentMonthExpenses = useMemo(
+    () =>
+      expenseList
+        .filter((r) => r.date?.toString().slice(0, 7) === curM)
+        .reduce((s, r) => s + Number(r.amount), 0),
+    [expenseList, curM]
+  );
+
+  const currentNetCashflow = currentMonthIncome - currentMonthExpenses;
+  const savingsRate = currentMonthIncome > 0 ? Number(((currentNetCashflow / currentMonthIncome) * 100).toFixed(1)) : 0;
+  const expenseRatio = currentMonthIncome > 0 ? Number(((currentMonthExpenses / currentMonthIncome) * 100).toFixed(1)) : 0;
+
+  /* ── Habit Check-in Action ── */
+  async function toggleHabitCheckin(habitId) {
+    setCheckingHabitId(habitId);
     try {
-      await habitsAPI.checkIn(habit._id);
-      toast.success(checkedToday ? 'Check-in removed.' : `"${habit.title}" checked in!`);
-      const habRes = await habitsAPI.getAll({ isActive: true });
-      setHabits(habRes.data.data.habits);
+      const res = await api.post(`/habits/${habitId}/checkin`);
+      // Update habit streak in local habits list
+      setHabits((prev) =>
+        prev.map((h) =>
+          h.id === habitId
+            ? { ...h, current_streak: res.current_streak, longest_streak: res.longest_streak }
+            : h
+        )
+      );
+
+      // Refresh logs for this habit
+      const logs = await api.get(`/habits/${habitId}/logs?days=30`);
+      setHabitLogs((prev) => ({ ...prev, [habitId]: logs }));
     } catch {
-      toast.error('Check-in failed.');
+      /* silent */
     } finally {
-      setCheckingIn(null);
+      setCheckingHabitId(null);
     }
-  };
-
-  const openContrib = (goal) => { 
-    setSelectedGoal(goal); 
-    setContribAmount(''); 
-    setContribNote(''); 
-    setContribModal(true); 
-  };
-
-  const handleContribute = async () => {
-    if (!contribAmount || Number(contribAmount) <= 0) return toast.error('Enter a valid amount.');
-    setSavingGoal(true);
-    try {
-      await goalsAPI.contribute(selectedGoal._id, { amount: Number(contribAmount), note: contribNote });
-      toast.success(`$${contribAmount} added to "${selectedGoal.title}"!`);
-      setContribModal(false);
-      const res = await goalsAPI.getAll();
-      setGoals(res.data.data.goals.filter(g => !g.isCompleted));
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Contribution failed.');
-    } finally {
-      setSavingGoal(false);
-    }
-  };
-
-  // Calculations & zero-data safeguards
-  const currentMonth = summary[summary.length - 1] || { income: 0, expense: 0 };
-  const prevMonth = summary[summary.length - 2] || { income: 0, expense: 0 };
-  const savingsRate = currentMonth.income > 0
-    ? (((currentMonth.income - currentMonth.expense) / currentMonth.income) * 100).toFixed(1)
-    : '0.0';
-  const incomeTrend = prevMonth.income > 0
-    ? ((currentMonth.income - prevMonth.income) / prevMonth.income) * 100 : 0;
-  const expenseTrend = prevMonth.expense > 0
-    ? ((currentMonth.expense - prevMonth.expense) / prevMonth.expense) * 100 : 0;
-
-  const hasBarData = summary && summary.length > 0 && summary.some((s) => (s.income > 0 || s.expense > 0));
-
-  const expByCategory = recentTx
-    .filter((t) => t.type === 'expense')
-    .reduce((acc, t) => {
-      acc[t.category] = (acc[t.category] || 0) + t.amount;
-      return acc;
-    }, {});
-  const pieData = Object.entries(expByCategory)
-    .map(([name, value]) => ({ name, value }))
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 6);
-
-  const activeHabitsWithStreak = habits.filter((h) => h.currentStreak > 0);
-
-  if (loading) {
-    return (
-      <div className="space-y-8 animate-fade-in">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2">
-          <div className="space-y-2">
-            <div className="h-8 w-64 bg-slate-200/70 rounded-xl animate-pulse" />
-            <div className="h-4 w-96 bg-slate-100 rounded-lg animate-pulse" />
-          </div>
-          <div className="h-9 w-36 bg-slate-200/70 rounded-xl animate-pulse" />
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <StatCardSkeleton key={i} />
-          ))}
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div className="md:col-span-2 lg:col-span-2">
-            <ChartSkeleton height="h-[360px]" />
-          </div>
-          <div className="md:col-span-2 lg:col-span-1">
-            <ChartSkeleton height="h-[360px]" />
-          </div>
-          <CardSkeleton height="h-64" />
-          <CardSkeleton height="h-64" />
-          <CardSkeleton height="h-64" />
-          <div className="md:col-span-2 lg:col-span-3">
-            <TableSkeleton rows={5} cols={4} />
-          </div>
-        </div>
-      </div>
-    );
   }
 
+  const today = todayStr();
+
   return (
-    <div className="animate-fade-in space-y-8">
-      {/* Page Header */}
-      <PageHeader 
-        title={`Welcome, ${user?.name?.split(' ')[0]} 👋`}
-        description="Institutional portfolio metrics, streak momentum, and capital growth."
-      >
-        <Link to="/transactions">
-          <Button size="sm">
-            <Plus size={15} /> Add Transaction
-          </Button>
-        </Link>
-      </PageHeader>
+    <main className="max-w-6xl mx-auto px-4 py-8 flex flex-col gap-6 animate-fade-in">
+      {/* ── Top Bar / Quick Actions ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--ink)' }}>
+            Financial Overview
+          </h1>
+          <p className="text-xs font-medium mt-0.5" style={{ color: 'var(--muted)' }}>
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+          </p>
+        </div>
 
-      {/* KPI Stat Cards with tabular numbers and refined borders */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        <StatCard
-          icon={Wallet}
-          label="Total Net Worth"
-          value={<span className="tabular-nums">{fmt(netWorth?.totalValuation || 0, user?.currency)}</span>}
-          sub={<span className="tabular-nums">Cost Basis: {fmt(netWorth?.totalInvested || 0, user?.currency)}</span>}
-          color="emerald"
-        />
-        <StatCard
-          icon={TrendingUp}
-          label="Monthly Income"
-          value={<span className="tabular-nums">{fmt(currentMonth.income, user?.currency)}</span>}
-          trend={incomeTrend}
-          color="emerald"
-        />
-        <StatCard
-          icon={TrendingDown}
-          label="Monthly Expenses"
-          value={<span className="tabular-nums">{fmt(currentMonth.expense, user?.currency)}</span>}
-          trend={expenseTrend}
-          color="red"
-        />
-        <StatCard
-          icon={DollarSign}
-          label="Savings Rate"
-          value={<span className="tabular-nums">{savingsRate}%</span>}
-          sub="of gross cash preserved"
-          color={savingsRate >= 20 ? 'emerald' : savingsRate >= 10 ? 'amber' : 'red'}
-        />
-        <StatCard
-          icon={Activity}
-          label="Active Streaks"
-          value={<span className="tabular-nums">{activeHabitsWithStreak.length}</span>}
-          sub="disciplines maintained"
-          color="amber"
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setQuickModal('expense')}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-white shadow-sm transition-all hover:opacity-90 active:scale-95"
+            style={{ background: 'var(--rose)' }}
+          >
+            <span>+</span> Add Expense
+          </button>
+          <button
+            onClick={() => setQuickModal('income')}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-white shadow-sm transition-all hover:opacity-90 active:scale-95"
+            style={{ background: 'var(--mint)' }}
+          >
+            <span>+</span> Add Income
+          </button>
+          <button
+            onClick={() => setShowInvestModal(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-white shadow-sm transition-all hover:opacity-90 active:scale-95"
+            style={{ background: 'var(--coral)' }}
+          >
+            <span>+</span> Add Investment
+          </button>
+          <a
+            href="#habits-section"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all hover:opacity-90 active:scale-95"
+            style={{ background: 'var(--surface)', border: '1.5px solid var(--border)', color: 'var(--ink)' }}
+          >
+            <span>✓</span> Habit Check-in
+          </a>
+        </div>
       </div>
 
-      {/* Main Charts & Analytics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        
-        {/* Income vs Expenses Bar Chart */}
-        <Card className="md:col-span-2 lg:col-span-2 flex flex-col p-5 sm:p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="font-semibold text-slate-900 tracking-tight text-base">Income vs Expenses</h2>
-              <p className="text-xs text-slate-400 mt-0.5">Bi-annual cash flow distribution</p>
-            </div>
-            <Badge color="emerald" size="sm">6 Months</Badge>
-          </div>
-          <div className="flex-1 min-h-[300px] flex flex-col justify-center">
-            {hasBarData ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={summary} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} dy={8} />
-                  <YAxis
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#64748b', fontSize: 12 }}
-                    tickFormatter={(v) => `$${v / 1000}k`}
-                  />
-                  <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f8fafc' }} />
-                  <Legend
-                    wrapperStyle={{ fontSize: 12, color: '#64748b', paddingTop: '16px' }}
-                    iconType="circle"
-                    iconSize={8}
-                  />
-                  <Bar dataKey="income" name="Income" fill="#10b981" radius={[6, 6, 0, 0]} maxBarSize={36} />
-                  <Bar dataKey="expense" name="Expense" fill="#f43f5e" radius={[6, 6, 0, 0]} maxBarSize={36} />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center text-center p-6 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
-                <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 mb-3 shadow-xs">
-                  <ArrowLeftRight size={22} />
+      {loading ? (
+        <div className="py-20 text-center text-sm" style={{ color: 'var(--muted)' }}>
+          Loading dashboard metrics…
+        </div>
+      ) : (
+        <>
+          {/* ── Row 1: Key Financial Metrics ── */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {/* Net Worth Card */}
+            <Card padding="p-5" className="flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <Card.Label>Total Net Worth</Card.Label>
+                  <Link to="/analytics" className="text-xs font-semibold hover:underline" style={{ color: 'var(--coral)' }}>
+                    Analytics →
+                  </Link>
                 </div>
-                <h4 className="text-sm font-semibold text-slate-800">No Cash Flow Data Yet</h4>
-                <p className="text-xs text-slate-400 max-w-sm mt-1 mb-4 leading-relaxed">
-                  Record your initial earnings or routine expenditures to visualize bi-annual cash flow momentum.
-                </p>
-                <Link to="/transactions">
-                  <Button size="sm">
-                    <Plus size={14} /> Record First Transaction
-                  </Button>
-                </Link>
+                <Card.Stat className="text-3xl">{fmt(latestNW)}</Card.Stat>
               </div>
-            )}
-          </div>
-        </Card>
-
-        {/* Expense Distribution Donut Chart */}
-        <Card className="md:col-span-2 lg:col-span-1 flex flex-col p-5 sm:p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="font-semibold text-slate-900 tracking-tight text-base">Spending Allocation</h2>
-              <p className="text-xs text-slate-400 mt-0.5">Top expenditure categories</p>
-            </div>
-            <span className="text-2xs font-semibold text-slate-500 uppercase tracking-wider">Recent</span>
-          </div>
-          <div className="flex-1 min-h-[300px] flex items-center justify-center">
-            {pieData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="45%"
-                    innerRadius={68}
-                    outerRadius={96}
-                    paddingAngle={3}
-                    dataKey="value"
-                    stroke="#ffffff"
-                    strokeWidth={2}
-                  >
-                    {pieData.map((_, i) => (
-                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip content={<CustomTooltip />} />
-                  <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, color: '#64748b' }} />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center text-center p-6 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
-                <div className="w-12 h-12 rounded-2xl bg-slate-100 border border-slate-200/80 flex items-center justify-center text-slate-400 mb-3">
-                  <DollarSign size={22} />
-                </div>
-                <h4 className="text-sm font-semibold text-slate-800">No Expense Outflows</h4>
-                <p className="text-xs text-slate-400 max-w-xs mt-1 mb-4 leading-relaxed">
-                  Categorized spending distributions will aggregate here as expenses are logged.
-                </p>
-                <Link to="/transactions">
-                  <Button size="sm" variant="secondary">
-                    <Plus size={14} /> Log Expense
-                  </Button>
-                </Link>
-              </div>
-            )}
-          </div>
-        </Card>
-
-        {/* Wealth Assets Summary */}
-        <Card className="p-5 sm:p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-slate-900 flex items-center gap-2 text-sm tracking-tight">
-              <Wallet size={17} className="text-emerald-600" /> Wealth Allocation
-            </h2>
-            <Link to="/wealth" className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-0.5">
-              View all <ChevronRight size={13} />
-            </Link>
-          </div>
-          {netWorth?.assets?.length === 0 ? (
-            <div className="text-center py-8 text-slate-400 flex flex-col items-center">
-              <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 mb-2.5">
-                <Wallet size={18} />
-              </div>
-              <p className="text-xs font-semibold text-slate-700">No assets recorded</p>
-              <p className="text-2xs text-slate-400 mt-0.5 mb-3">Track equities, crypto, and real estate.</p>
-              <Link to="/wealth"><Button variant="secondary" size="sm"><Plus size={13} /> Add First Asset</Button></Link>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {netWorth?.assets?.slice(0, 4).map((a) => {
-                const returnPct = a.investedAmount > 0 ? (((a.valuation - a.investedAmount) / a.investedAmount) * 100) : 0;
-                return (
-                  <div
-                    key={a._id}
-                    className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-slate-200/80 hover:bg-slate-50/60 transition-all"
-                  >
-                    <div className="min-w-0 pr-2">
-                      <p className="text-xs font-semibold text-slate-900 truncate">{a.name}</p>
-                      <p className="text-2xs text-slate-400 capitalize">{a.assetType}</p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-xs font-bold text-slate-900 tabular-nums">{fmt(a.valuation, user?.currency)}</p>
-                      <p className={`text-2xs font-semibold tabular-nums ${returnPct >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                        {returnPct >= 0 ? '+' : ''}{returnPct.toFixed(2)}%
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </Card>
-
-        {/* Savings Goals */}
-        <Card className="p-5 sm:p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-slate-900 flex items-center gap-2 text-sm tracking-tight">
-              <Target size={17} className="text-indigo-600" /> Savings Goals
-            </h2>
-            <Link to="/goals" className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-0.5">
-              View all <ChevronRight size={13} />
-            </Link>
-          </div>
-          {goals.length === 0 ? (
-            <div className="text-center py-8 text-slate-400 flex flex-col items-center">
-              <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100/60 flex items-center justify-center text-indigo-600 mb-2.5">
-                <Target size={18} />
-              </div>
-              <p className="text-xs font-semibold text-slate-700">No active goals</p>
-              <p className="text-2xs text-slate-400 mt-0.5 mb-3">Define milestones for emergency or travel.</p>
-              <Link to="/goals"><Button variant="secondary" size="sm"><Plus size={13} /> Create First Goal</Button></Link>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {goals.slice(0, 3).map((g) => {
-                const pct = g.targetAmount > 0
-                  ? Math.min((g.currentAmount / g.targetAmount) * 100, 100).toFixed(1)
-                  : '0.0';
-                return (
-                  <div
-                    key={g._id}
-                    className="p-3 rounded-xl border border-slate-100 hover:border-slate-200/80 transition-all bg-white"
-                  >
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="text-lg shrink-0">{g.icon || CATEGORY_ICONS[g.category] || '🎯'}</span>
-                        <div className="min-w-0">
-                          <p className="text-xs font-semibold text-slate-900 truncate leading-tight">{g.title}</p>
-                          <p className="text-2xs text-slate-400 tabular-nums mt-0.5">
-                            {fmt(g.currentAmount)} / {fmt(g.targetAmount)} ({pct}%)
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => openContrib(g)}
-                        className="text-2xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/60 px-2 py-1 rounded-lg transition-colors shrink-0"
-                      >
-                        + Add
-                      </button>
-                    </div>
-                    <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-emerald-500 rounded-full transition-all duration-500"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </Card>
-
-        {/* Habit Check-In */}
-        <Card className="p-5 sm:p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-slate-900 flex items-center gap-2 text-sm tracking-tight">
-              <Flame size={17} className="text-amber-500" /> Habit Check-In
-            </h2>
-            <Link to="/habits" className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-0.5">
-              View all <ChevronRight size={13} />
-            </Link>
-          </div>
-          {habits.length === 0 ? (
-            <div className="text-center py-8 text-slate-400 flex flex-col items-center">
-              <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-100/60 flex items-center justify-center text-amber-500 mb-2.5">
-                <Flame size={18} />
-              </div>
-              <p className="text-xs font-semibold text-slate-700">No active habits</p>
-              <p className="text-2xs text-slate-400 mt-0.5 mb-3">Build streaks for savings or budget reviews.</p>
-              <Link to="/habits"><Button variant="secondary" size="sm"><Plus size={13} /> Create First Habit</Button></Link>
-            </div>
-          ) : (
-            <div className="space-y-2.5">
-              {habits.slice(0, 4).map((h) => {
-                const today = new Date().toDateString();
-                const checkedToday = h.logs?.some((l) => new Date(l.date).toDateString() === today && l.completed);
-                return (
-                  <div
-                    key={h._id}
-                    className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 hover:border-slate-200/80 transition-all bg-white"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                      <div
-                        className={`w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0 border ${
-                          checkedToday ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-100'
-                        }`}
-                      >
-                        {h.icon}
-                      </div>
-                      <div className="min-w-0">
-                        <p
-                          className={`text-xs font-semibold truncate transition-colors ${
-                            checkedToday ? 'text-slate-400 line-through' : 'text-slate-900'
-                          }`}
-                        >
-                          {h.title}
-                        </p>
-                        <p className="text-2xs font-semibold text-amber-600 flex items-center gap-1 mt-0.5 tabular-nums">
-                          <Flame size={11} className="text-amber-500" /> {h.currentStreak || 0} day streak
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleCheckIn(h)}
-                      disabled={checkingIn === h._id}
-                      className={`flex items-center justify-center p-2 rounded-xl transition-all duration-150 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 ${
-                        checkedToday 
-                          ? 'bg-emerald-100/90 text-emerald-700 shadow-xs' 
-                          : 'bg-white border border-slate-200 text-slate-300 hover:border-emerald-300 hover:text-emerald-600 hover:bg-emerald-50/60'
-                      }`}
-                      title={checkedToday ? 'Undo check-in' : 'Check in today'}
-                      aria-label={checkedToday ? 'Undo check-in' : 'Check in today'}
-                    >
-                      {checkingIn === h._id ? (
-                        <Spinner size="sm" />
-                      ) : checkedToday ? (
-                        <CheckCircle size={18} className="fill-current text-emerald-600" />
-                      ) : (
-                        <Circle size={18} />
-                      )}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </Card>
-
-        {/* Recent Transactions Table */}
-        <Card className="md:col-span-2 lg:col-span-3 p-5 sm:p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="font-semibold text-slate-900 flex items-center gap-2 text-base tracking-tight">
-                <ArrowLeftRight size={17} className="text-slate-600" /> Recent Transactions
-              </h2>
-              <p className="text-xs text-slate-400 mt-0.5">Real-time ledger activity</p>
-            </div>
-            <Link to="/transactions" className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-0.5">
-              View all <ChevronRight size={13} />
-            </Link>
-          </div>
-          {recentTx.length === 0 ? (
-            <div className="text-center py-10 text-slate-400 flex flex-col items-center">
-              <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 mb-2.5">
-                <ArrowLeftRight size={20} />
-              </div>
-              <p className="font-semibold text-slate-700 text-xs">No recent transaction records</p>
-              <p className="text-2xs text-slate-400 mt-0.5 mb-3">Log your daily revenues or expenses to view live ledger flow.</p>
-              <Link to="/transactions">
-                <Button size="sm"><Plus size={13} /> Record First Transaction</Button>
-              </Link>
-            </div>
-          ) : (
-            <div className="overflow-x-auto -mx-5 sm:-mx-6">
-              <table className="w-full min-w-[540px]">
-                <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50/50">
-                    <th scope="col" className="text-left py-2.5 px-5 text-2xs font-semibold text-slate-500 uppercase tracking-wider">Transaction</th>
-                    <th scope="col" className="text-left py-2.5 px-5 text-2xs font-semibold text-slate-500 uppercase tracking-wider">Category</th>
-                    <th scope="col" className="text-left py-2.5 px-5 text-2xs font-semibold text-slate-500 uppercase tracking-wider">Date</th>
-                    <th scope="col" className="text-right py-2.5 px-5 text-2xs font-semibold text-slate-500 uppercase tracking-wider">Amount</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {recentTx.slice(0, 5).map((tx) => (
-                    <tr key={tx._id} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="py-3 px-5">
-                        <div className="flex items-center gap-2.5">
-                          <div
-                            className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border ${
-                              tx.type === 'income'
-                                ? 'bg-emerald-50 border-emerald-100 text-emerald-600'
-                                : 'bg-rose-50 border-rose-100 text-rose-600'
-                            }`}
-                          >
-                            {tx.type === 'income' ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
-                          </div>
-                          <span className="text-xs font-semibold text-slate-900 truncate max-w-[220px]">
-                            {tx.description || tx.category}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-5">
-                        <Badge color={tx.type === 'income' ? 'emerald' : 'slate'} size="sm">
-                          {tx.category}
-                        </Badge>
-                      </td>
-                      <td className="py-3 px-5 text-xs text-slate-500 tabular-nums">
-                        {new Date(tx.date).toLocaleDateString()}
-                      </td>
-                      <td className={`py-3 px-5 text-xs font-bold text-right tabular-nums ${tx.type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`}>
-                        {tx.type === 'income' ? '+' : '−'}{fmt(tx.amount, user?.currency)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
-
-      </div>
-
-      {/* Contribute Modal for Goals */}
-      <Modal isOpen={contribModal} onClose={() => setContribModal(false)} title={`Add to "${selectedGoal?.title}"`} size="sm">
-        <div className="space-y-4">
-          {selectedGoal && (
-            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 text-xs">
-              <div className="flex justify-between text-slate-600 mb-1.5">
-                <span>Current Saved</span>
-                <span className="font-semibold text-slate-900 tabular-nums">{fmt(selectedGoal.currentAmount, user?.currency)}</span>
-              </div>
-              <div className="flex justify-between text-slate-600 font-medium">
-                <span>Remaining Target</span>
-                <span className="text-emerald-700 font-bold tabular-nums">
-                  {fmt(selectedGoal.targetAmount - selectedGoal.currentAmount, user?.currency)}
+              <div className="mt-4 flex items-center justify-between">
+                {nwDelta !== null ? (
+                  <Card.Delta direction={Number(nwDelta) >= 0 ? 'up' : 'down'}>
+                    {Math.abs(Number(nwDelta))}% vs last month
+                  </Card.Delta>
+                ) : (
+                  <Card.Delta direction="neutral">
+                    No previous month data
+                  </Card.Delta>
+                )}
+                <span className="text-xs" style={{ color: 'var(--muted)' }}>
+                  Cash flow + Investments
                 </span>
               </div>
-            </div>
-          )}
-          <Input
-            label="Contribution amount ($)"
-            type="number"
-            min="0.01"
-            placeholder="100.00"
-            value={contribAmount}
-            onChange={(e) => setContribAmount(e.target.value)}
-            disabled={savingGoal}
-          />
-          <Input
-            label="Note (optional)"
-            placeholder="e.g. Dividend payout allocation"
-            value={contribNote}
-            onChange={(e) => setContribNote(e.target.value)}
-            disabled={savingGoal}
-          />
-          <div className="flex gap-2.5 pt-2">
-            <Button variant="secondary" className="flex-1" onClick={() => setContribModal(false)} disabled={savingGoal}>
-              Cancel
-            </Button>
-            <Button className="flex-1" loading={savingGoal} disabled={savingGoal} onClick={handleContribute}>
-              {savingGoal ? 'Adding Funds...' : 'Add Funds'}
-            </Button>
-          </div>
-        </div>
-      </Modal>
+            </Card>
 
-    </div>
+            {/* Income vs Expenses Card */}
+            <Card padding="p-5" className="flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <Card.Label>Cashflow This Month</Card.Label>
+                  <Link to="/tracker" className="text-xs font-semibold hover:underline" style={{ color: 'var(--coral)' }}>
+                    Tracker →
+                  </Link>
+                </div>
+                <div className="flex items-baseline justify-between">
+                  <div>
+                    <span className="text-xs" style={{ color: 'var(--muted)' }}>Income: </span>
+                    <strong style={{ color: 'var(--mint)' }}>{fmt(currentMonthIncome)}</strong>
+                  </div>
+                  <div>
+                    <span className="text-xs" style={{ color: 'var(--muted)' }}>Spent: </span>
+                    <strong style={{ color: 'var(--rose)' }}>{fmt(currentMonthExpenses)}</strong>
+                  </div>
+                </div>
+
+                {/* Progress bar */}
+                <div className="w-full h-2 rounded-full mt-3 overflow-hidden" style={{ background: 'var(--canvas)' }}>
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{
+                      width: `${expenseRatio}%`,
+                      background: expenseRatio > 90 ? 'var(--rose)' : 'var(--coral)',
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4 flex items-center justify-between text-xs">
+                <span style={{ color: 'var(--muted)' }}>Net Savings:</span>
+                <span className="font-bold" style={{ color: currentNetCashflow >= 0 ? 'var(--mint)' : 'var(--rose)' }}>
+                  {fmt(currentNetCashflow)} ({savingsRate}% rate)
+                </span>
+              </div>
+            </Card>
+
+            {/* Investments Quick Stats */}
+            <Card padding="p-5" className="flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <Card.Label>Active Investments</Card.Label>
+                  <Link to="/analytics" className="text-xs font-semibold hover:underline" style={{ color: 'var(--coral)' }}>
+                    View →
+                  </Link>
+                </div>
+                <Card.Stat className="text-3xl">
+                  {fmt(breakdown?.investments?.reduce((s, r) => s + Number(r.total), 0) || 0)}
+                </Card.Stat>
+              </div>
+              <div className="mt-4 text-xs flex items-center justify-between" style={{ color: 'var(--muted)' }}>
+                <span>Assets portfolio</span>
+                <span>{breakdown?.investments?.length || 0} categories</span>
+              </div>
+            </Card>
+          </div>
+
+          {/* ── Row 2: Habit Streaks & Savings Goals ── */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Active Habit Streaks Card */}
+            <Card padding="p-6" id="habits-section">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="font-bold text-base" style={{ color: 'var(--ink)' }}>
+                    Active Habit Streaks
+                  </h2>
+                  <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                    Check off habits directly from your dashboard
+                  </p>
+                </div>
+                <Link to="/habits" className="text-xs font-semibold hover:underline" style={{ color: 'var(--coral)' }}>
+                  All Habits →
+                </Link>
+              </div>
+
+              {habits.length === 0 ? (
+                <p className="text-xs py-6 text-center" style={{ color: 'var(--muted)' }}>
+                  No habits added yet. <Link to="/habits" className="underline">Create your first habit</Link>.
+                </p>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {habits.slice(0, 4).map((h) => {
+                    const logs = habitLogs[h.id] || [];
+                    const todayLog = logs.find((l) => l.date?.toString().slice(0, 10) === today);
+                    const isDoneToday = todayLog?.completed === true;
+                    const isBusy = checkingHabitId === h.id;
+
+                    return (
+                      <div
+                        key={h.id}
+                        className="flex items-center justify-between p-3 rounded-xl transition-all"
+                        style={{ background: 'var(--canvas)', border: '1px solid var(--border)' }}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <StreakGauge streak={h.current_streak || 0} max={Math.max(h.longest_streak || 30, 30)} size={44} />
+                          <div className="min-w-0">
+                            <p className="font-semibold text-sm truncate" style={{ color: 'var(--ink)' }}>
+                              {h.name}
+                            </p>
+                            <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                              Streak: {h.current_streak || 0} days {h.longest_streak ? `(Best: ${h.longest_streak})` : ''}
+                            </p>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => toggleHabitCheckin(h.id)}
+                          disabled={isBusy}
+                          className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95 flex items-center gap-1.5"
+                          style={{
+                            background: isDoneToday ? 'rgba(47,168,108,0.12)' : 'var(--coral)',
+                            color: isDoneToday ? 'var(--mint)' : '#fff',
+                            border: isDoneToday ? '1.5px solid var(--mint)' : 'none',
+                          }}
+                        >
+                          {isBusy ? (
+                            <span
+                              className="w-3 h-3 rounded-full border-2 border-t-transparent animate-spin inline-block"
+                              style={{ borderColor: 'currentColor', borderTopColor: 'transparent' }}
+                            />
+                          ) : isDoneToday ? (
+                            '✓ Done'
+                          ) : (
+                            '○ Mark Done'
+                          )}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </Card>
+
+            {/* Savings Goals Progress Card */}
+            <Card padding="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="font-bold text-base" style={{ color: 'var(--ink)' }}>
+                    Savings Goals Progress
+                  </h2>
+                  <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                    Track your active wealth growth targets
+                  </p>
+                </div>
+                <Link to="/goals" className="text-xs font-semibold hover:underline" style={{ color: 'var(--coral)' }}>
+                  All Goals →
+                </Link>
+              </div>
+
+              {goals.length === 0 ? (
+                <p className="text-xs py-6 text-center" style={{ color: 'var(--muted)' }}>
+                  No savings goals set. <Link to="/goals" className="underline">Create a goal</Link>.
+                </p>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  {goals.slice(0, 3).map((g) => {
+                    const target = Number(g.target_amount) || 1;
+                    const current = Number(g.current_amount) || 0;
+                    const pct = Math.min(100, Math.round((current / target) * 100));
+
+                    return (
+                      <div
+                        key={g.id}
+                        className="p-3.5 rounded-xl flex flex-col gap-2"
+                        style={{ background: 'var(--canvas)', border: '1px solid var(--border)' }}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-sm" style={{ color: 'var(--ink)' }}>
+                            {g.name}
+                          </span>
+                          <span className="text-xs font-bold" style={{ color: 'var(--coral)' }}>
+                            {pct}%
+                          </span>
+                        </div>
+
+                        <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: 'var(--surface)' }}>
+                          <div
+                            className="h-full rounded-full transition-all duration-500"
+                            style={{ width: `${pct}%`, background: 'var(--coral)' }}
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between text-xs mt-0.5">
+                          <span style={{ color: 'var(--muted)' }}>
+                            {fmt(current)} of {fmt(target)}
+                          </span>
+                          <button
+                            onClick={() => setDepositGoal(g)}
+                            className="font-medium hover:underline text-xs"
+                            style={{ color: 'var(--mint)' }}
+                          >
+                            + Add Deposit
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </Card>
+          </div>
+        </>
+      )}
+
+      {/* ── Modals ── */}
+      <QuickRecordModal
+        type={quickModal}
+        open={Boolean(quickModal)}
+        onClose={() => setQuickModal(null)}
+        onSuccess={fetchAllData}
+      />
+
+      <QuickDepositModal
+        goal={depositGoal}
+        open={Boolean(depositGoal)}
+        onClose={() => setDepositGoal(null)}
+        onSuccess={fetchAllData}
+      />
+
+      <AddInvestmentModal
+        open={showInvestModal}
+        onClose={() => setShowInvestModal(false)}
+        onSuccess={fetchAllData}
+      />
+    </main>
   );
 }

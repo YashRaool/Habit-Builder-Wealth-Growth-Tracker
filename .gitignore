@@ -5,4 +5,13 @@ dist/
 .DS_Store
 backend/
 frontend/
-
+.agent/
+.agents/
+.gemini/
+.gsd/
+adapters/
+scripts/
+model_capabilities.yaml
+GSD-STYLE.md
+PROJECT_RULES.md
+VERSION

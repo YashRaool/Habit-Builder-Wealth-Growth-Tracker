@@ -1,59 +1,70 @@
-import { createContext, useContext, useState, useEffect } from 'react';
-import { authAPI } from '../api/auth';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { api } from '@/lib/api';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => {
-    try {
-      const stored = localStorage.getItem('fht_user');
-      return stored ? JSON.parse(stored) : null;
-    } catch {
-      return null;
-    }
-  });
-  const [loading, setLoading] = useState(true);
+  const [user,    setUser]    = useState(null);
+  const [loading, setLoading] = useState(true); // resolving stored token
 
-  // Verify token on mount
+  /* Restore session from localStorage on mount */
   useEffect(() => {
-    const token = localStorage.getItem('fht_token');
-    if (token) {
-      authAPI.getMe()
-        .then((res) => setUser(res.data.data.user))
-        .catch(() => logout())
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
+    const token = localStorage.getItem('wh-token');
+    if (!token) { setLoading(false); return; }
+
+    api.get('/auth/me')
+      .then((res) => {
+        const u = res?.user || res?.data?.user || (res?.data && res.data._id ? res.data : null);
+        if (u) setUser(u);
+      })
+      .catch(() => { localStorage.removeItem('wh-token'); })
+      .finally(() => setLoading(false));
   }, []);
 
-  const login = (token, userData) => {
-    localStorage.setItem('fht_token', token);
-    localStorage.setItem('fht_user', JSON.stringify(userData));
-    setUser(userData);
-  };
+  const login = useCallback(async (email, password) => {
+    const res = await api.post('/auth/login', { email, password });
+    const token = res.token || res.data?.token;
+    const user = res.user || res.data?.user;
+    if (!token || !user) throw { errors: ['Invalid authentication response'] };
+    localStorage.setItem('wh-token', token);
+    setUser(user);
+    return user;
+  }, []);
 
-  const logout = () => {
-    localStorage.removeItem('fht_token');
-    localStorage.removeItem('fht_user');
+  const register = useCallback(async (name, email, password) => {
+    const res = await api.post('/auth/register', { name, email, password });
+    const token = res.token || res.data?.token;
+    const user = res.user || res.data?.user;
+    if (!token || !user) throw { errors: ['Invalid authentication response'] };
+    localStorage.setItem('wh-token', token);
+    setUser(user);
+    return user;
+  }, []);
+
+  const loginWithGoogle = useCallback(async (credential) => {
+    const res = await api.post('/auth/google', { credential });
+    const token = res.token || res.data?.token;
+    const loggedInUser = res.user || res.data?.user;
+    if (!token || !loggedInUser) throw { errors: ['Invalid authentication response'] };
+    localStorage.setItem('wh-token', token);
+    setUser(loggedInUser);
+    return loggedInUser;
+  }, []);
+
+  const logout = useCallback(() => {
+    localStorage.removeItem('wh-token');
     setUser(null);
-  };
-
-  const updateUser = (updates) => {
-    const updated = { ...user, ...updates };
-    localStorage.setItem('fht_user', JSON.stringify(updated));
-    setUser(updated);
-  };
+  }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, updateUser, isAdmin: user?.role === 'admin' }}>
+    <AuthContext.Provider value={{ user, loading, login, register, loginWithGoogle, logout }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
-export const useAuth = () => {
+export function useAuth() {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  if (!ctx) throw new Error('useAuth must be inside <AuthProvider>');
   return ctx;
-};
+}

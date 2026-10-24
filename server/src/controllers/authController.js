@@ -60,7 +60,14 @@ const register = async (req, res) => {
     });
 
     const token = signToken(user._id);
-    return sendCreated(res, authPayload(user, token), 'Account created successfully.');
+    const payload = authPayload(user, token);
+    return res.status(201).json({
+      success: true,
+      message: 'Account created successfully.',
+      data: payload,
+      token,
+      user: payload.user,
+    });
   } catch (err) {
     if (err.code === 11000) {
       return res.status(409).json({ success: false, message: 'An account with this email already exists.' });
@@ -98,10 +105,66 @@ const login = async (req, res) => {
     }
 
     const token = signToken(user._id);
-    return sendSuccess(res, authPayload(user, token), 'Login successful.');
+    const payload = authPayload(user, token);
+    return res.status(200).json({
+      success: true,
+      message: 'Login successful.',
+      data: payload,
+      token,
+      user: payload.user,
+    });
   } catch (err) {
     console.error('Login error:', err);
     return res.status(500).json({ success: false, message: 'Login failed due to a server error. Please try again.' });
+  }
+};
+
+/** POST /api/auth/google */
+const googleLogin = async (req, res) => {
+  try {
+    const { credential } = req.body || {};
+    if (!credential) {
+      return sendBadRequest(res, 'Google credential is required.');
+    }
+
+    let payload;
+    try {
+      payload = jwt.decode(credential);
+    } catch (e) {
+      return res.status(401).json({ success: false, message: 'Invalid Google credential token.' });
+    }
+
+    if (!payload || !payload.email) {
+      return res.status(401).json({ success: false, message: 'Invalid Google credential payload.' });
+    }
+
+    const email = payload.email.toLowerCase();
+    const name = payload.name || payload.given_name || email.split('@')[0];
+
+    let user = await User.findOne({ email });
+    if (!user) {
+      const crypto = require('crypto');
+      const randomPassword = crypto.randomBytes(24).toString('hex') + 'A1!';
+      user = await User.create({
+        name,
+        email,
+        passwordHash: randomPassword,
+        currency: 'USD',
+      });
+    }
+
+    const token = signToken(user._id);
+    const payloadData = authPayload(user, token);
+    return res.status(200).json({
+      success: true,
+      message: 'Google login successful.',
+      data: payloadData,
+      token,
+      user: payloadData.user,
+    });
+  } catch (err) {
+    console.error('Google login error:', err);
+    return res.status(500).json({ success: false, message: 'Google login failed due to a server error. Please try again.' });
   }
 };
 
@@ -168,4 +231,4 @@ const updatePassword = async (req, res) => {
   }
 };
 
-module.exports = { register, login, getMe, updateMe, updatePassword };
+module.exports = { register, login, googleLogin, getMe, updateMe, updatePassword };

@@ -1,48 +1,57 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
-import { ToastProvider } from './context/ToastContext';
-import ProtectedRoute from './routes/ProtectedRoute';
-import AdminRoute from './routes/AdminRoute';
-import Layout from './components/layout/Layout';
+import { ThemeProvider } from '@/context/ThemeContext';
+import { AuthProvider } from '@/context/AuthContext';
+import Nav from '@/components/Nav';
+import ProtectedRoute from '@/components/ProtectedRoute';
 
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
-import Transactions from './pages/Transactions';
-import Habits from './pages/Habits';
-import Goals from './pages/Goals';
-import Wealth from './pages/Wealth';
-import Admin from './pages/Admin';
-import Feedback from './pages/Feedback';
-import NotFound from './pages/NotFound';
+// Pages
+import Login     from '@/pages/Login';
+import Dashboard from '@/pages/Dashboard';
+import Tracker   from '@/pages/Tracker';
+import Habits    from '@/pages/Habits';
+import Goals     from '@/pages/Goals';
+import Analytics from '@/pages/Analytics';
+import Admin     from '@/pages/Admin';
+
+function Protected({ children, adminOnly = false }) {
+  return <ProtectedRoute adminOnly={adminOnly}>{children}</ProtectedRoute>;
+}
 
 export default function App() {
   return (
-    <BrowserRouter basename={import.meta.env.BASE_URL}>
-      <AuthProvider>
-        <ToastProvider>
-          <Routes>
-            {/* Public routes */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
+    <ThemeProvider>
+      <BrowserRouter basename={import.meta.env.BASE_URL}>
+        <AuthProvider>
+          <div
+            className="min-h-dvh"
+            style={{ background: 'var(--canvas)', color: 'var(--ink)' }}
+          >
+            <Nav />
 
-            {/* Protected app routes */}
-            <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-              <Route index element={<Navigate to="/dashboard" replace />} />
-              <Route path="dashboard" element={<Dashboard />} />
-              <Route path="transactions" element={<Transactions />} />
-              <Route path="habits" element={<Habits />} />
-              <Route path="goals" element={<Goals />} />
-              <Route path="wealth" element={<Wealth />} />
-              <Route path="feedback" element={<Feedback />} />
-              <Route path="admin" element={<AdminRoute><Admin /></AdminRoute>} />
-            </Route>
+            <Routes>
+              {/* Default redirect */}
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
-            {/* 404 Route */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </ToastProvider>
-      </AuthProvider>
-    </BrowserRouter>
+              {/* Public auth page */}
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Login />} />
+
+              {/* Protected app pages */}
+              <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
+              <Route path="/tracker"   element={<Protected><Tracker /></Protected>} />
+              <Route path="/habits"    element={<Protected><Habits /></Protected>} />
+              <Route path="/goals"     element={<Protected><Goals /></Protected>} />
+              <Route path="/analytics" element={<Protected><Analytics /></Protected>} />
+
+              {/* Admin-only */}
+              <Route path="/admin" element={<Protected adminOnly><Admin /></Protected>} />
+
+              {/* 404 */}
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </div>
+        </AuthProvider>
+      </BrowserRouter>
+    </ThemeProvider>
   );
 }
