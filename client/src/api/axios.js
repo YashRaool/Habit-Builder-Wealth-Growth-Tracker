@@ -1,7 +1,11 @@
 import axios from 'axios';
 
+const fallbackBaseURL = import.meta.env.PROD
+  ? 'https://wealthhabit-backend.onrender.com/api'
+  : '/api';
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
+  baseURL: import.meta.env.VITE_API_URL || fallbackBaseURL,
   timeout: 15000,
   headers: { 'Content-Type': 'application/json' },
 });
@@ -34,12 +38,13 @@ api.interceptors.response.use(
     const isAuthEndpoint = requestUrl.includes('/auth/login') || requestUrl.includes('/auth/register');
     const isAuthPage =
       typeof window !== 'undefined' &&
-      (window.location.pathname === '/login' || window.location.pathname === '/register');
+      (window.location.pathname.endsWith('/login') || window.location.pathname.endsWith('/register'));
 
     if (error.response?.status === 401 && !isAuthEndpoint && !isAuthPage) {
       localStorage.removeItem('fht_token');
       localStorage.removeItem('fht_user');
-      window.location.href = '/login';
+      const basePath = import.meta.env.BASE_URL || '/';
+      window.location.href = `${basePath.endsWith('/') ? basePath : basePath + '/'}login`;
     }
 
     return Promise.reject(error);
