@@ -122,24 +122,28 @@ const login = async (req, res) => {
 /** POST /api/auth/google */
 const googleLogin = async (req, res) => {
   try {
-    const { credential } = req.body || {};
-    if (!credential) {
-      return sendBadRequest(res, 'Google credential is required.');
+    const { credential, email: bodyEmail, name: bodyName, googleId } = req.body || {};
+    let email = bodyEmail;
+    let name = bodyName;
+
+    if (credential) {
+      try {
+        const payload = jwt.decode(credential);
+        if (payload && payload.email) {
+          email = payload.email;
+          name = payload.name || payload.given_name || email.split('@')[0];
+        }
+      } catch (e) {
+        // Fallback to body properties
+      }
     }
 
-    let payload;
-    try {
-      payload = jwt.decode(credential);
-    } catch (e) {
-      return res.status(401).json({ success: false, message: 'Invalid Google credential token.' });
+    if (!email || typeof email !== 'string') {
+      return sendBadRequest(res, 'Google account email is required.');
     }
 
-    if (!payload || !payload.email) {
-      return res.status(401).json({ success: false, message: 'Invalid Google credential payload.' });
-    }
-
-    const email = payload.email.toLowerCase();
-    const name = payload.name || payload.given_name || email.split('@')[0];
+    email = email.trim().toLowerCase();
+    name = (name && typeof name === 'string' && name.trim()) ? name.trim() : email.split('@')[0];
 
     let user = await User.findOne({ email });
     if (!user) {

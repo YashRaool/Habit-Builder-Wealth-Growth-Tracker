@@ -41,8 +41,11 @@ export function AuthProvider({ children }) {
     return user;
   }, []);
 
-  const loginWithGoogle = useCallback(async (credential) => {
-    const res = await api.post('/auth/google', { credential });
+  const loginWithGoogle = useCallback(async (credentialOrPayload) => {
+    const body = typeof credentialOrPayload === 'string'
+      ? { credential: credentialOrPayload }
+      : credentialOrPayload;
+    const res = await api.post('/auth/google', body);
     const token = res.token || res.data?.token;
     const loggedInUser = res.user || res.data?.user;
     if (!token || !loggedInUser) throw { errors: ['Invalid authentication response'] };
