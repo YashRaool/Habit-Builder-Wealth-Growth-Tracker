@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -30,7 +30,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: ./client
-        run: npm ci
+        run: npm install
 
       - name: Build project
         working-directory: ./client
@@ -38,17 +38,28 @@ jobs:
           VITE_API_URL: https://wealthhabit-backend.onrender.com/api
         run: npm run build
 
+      - name: Deploy to gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./client/dist
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
+        continue-on-error: true
+        with:
+          enablement: true
 
       - name: Upload build artifact
         uses: actions/upload-pages-artifact@v3
+        continue-on-error: true
         with:
           path: ./client/dist
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    continue-on-error: true
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
