@@ -145,9 +145,12 @@ function DepositModal({ goal, onDeposit, onClose }) {
 
 /* ─── Goal card ─── */
 function GoalCard({ goal, onEdit, onDelete, onOpenDeposit }) {
-  const p = pct(goal.current_amount, goal.target_amount);
-  const dl = daysLeft(goal.target_date);
+  const currentAmt = Number(goal?.current_amount ?? goal?.currentAmount) || 0;
+  const targetAmt = Number(goal?.target_amount ?? goal?.targetAmount) || 0;
+  const p = pct(currentAmt, targetAmt);
+  const dl = daysLeft(goal?.target_date ?? goal?.deadline);
   const completed = p >= 100;
+  const gid = goal?.id || goal?._id;
 
   return (
     <Card padding="p-5" className="flex flex-col gap-4">
@@ -157,12 +160,12 @@ function GoalCard({ goal, onEdit, onDelete, onOpenDeposit }) {
 
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="font-bold text-base leading-tight" style={{ color:'var(--ink)' }}>{goal.name}</h3>
+            <h3 className="font-bold text-base leading-tight" style={{ color:'var(--ink)' }}>{goal?.name || goal?.title || 'Goal'}</h3>
             <div className="flex gap-1 shrink-0">
               <button onClick={() => onEdit(goal)}
                       className="text-xs px-2 py-1 rounded-lg font-semibold"
                       style={{ color:'var(--coral)', background:'rgba(242,121,61,0.1)' }}>Edit</button>
-              <button onClick={() => onDelete(goal.id)}
+              <button onClick={() => onDelete(gid)}
                       className="text-xs px-2 py-1 rounded-lg font-semibold"
                       style={{ color:'var(--rose)', background:'rgba(226,87,76,0.08)' }}>Del</button>
             </div>
@@ -229,8 +232,17 @@ export default function Goals() {
 
   const fetchGoals = useCallback(async () => {
     setLoading(true);
-    try { setGoals(await api.get('/goals')); }
-    catch { /* silent */ }
+    try {
+      const res = await api.get('/goals');
+      const list = Array.isArray(res)
+        ? res
+        : Array.isArray(res?.data?.goals)
+        ? res.data.goals
+        : Array.isArray(res?.data)
+        ? res.data
+        : [];
+      setGoals(list);
+    } catch { /* silent */ }
     finally { setLoading(false); }
   }, []);
 
@@ -238,31 +250,33 @@ export default function Goals() {
 
   /* ── CRUD ── */
   async function handleSave(body) {
-    if (modal?.goal) {
-      const updated = await api.put(`/goals/${modal.goal.id}`, body);
-      setGoals(prev => prev.map(g => g.id === updated.id ? updated : g));
+    const gid = modal?.goal?.id || modal?.goal?._id;
+    if (gid) {
+      const updated = await api.put(`/goals/${gid}`, body);
+      setGoals(prev => (Array.isArray(prev) ? prev : []).map(g => (g?.id === gid || g?._id === gid) ? updated : g));
     } else {
       const created = await api.post('/goals', body);
-      setGoals(prev => [...prev, created]);
+      setGoals(prev => [...(Array.isArray(prev) ? prev : []), created]);
     }
   }
 
   async function handleDeposit(id, amount) {
     const updated = await api.patch(`/goals/${id}/deposit`, { amount });
-    setGoals(prev => prev.map(g => g.id === updated.id ? updated : g));
+    setGoals(prev => (Array.isArray(prev) ? prev : []).map(g => (g?.id === id || g?._id === id) ? updated : g));
   }
 
   async function handleDelete(id) {
     await api.del(`/goals/${id}`);
-    setGoals(prev => prev.filter(g => g.id !== id));
+    setGoals(prev => (Array.isArray(prev) ? prev : []).filter(g => g?.id !== id && g?._id !== id));
     setDelId(null);
   }
 
   /* ── Summary stats ── */
-  const totalTarget  = goals.reduce((s, g) => s + Number(g.target_amount), 0);
-  const totalSaved   = goals.reduce((s, g) => s + Number(g.current_amount), 0);
+  const safeGoals = Array.isArray(goals) ? goals : [];
+  const totalTarget  = safeGoals.reduce((s, g) => s + (Number(g?.target_amount ?? g?.targetAmount) || 0), 0);
+  const totalSaved   = safeGoals.reduce((s, g) => s + (Number(g?.current_amount ?? g?.currentAmount) || 0), 0);
   const overallPct   = pct(totalSaved, totalTarget);
-  const completedCnt = goals.filter(g => Number(g.current_amount) >= Number(g.target_amount)).length;
+  const completedCnt = safeGoals.filter(g => (Number(g?.current_amount ?? g?.currentAmount) || 0) >= (Number(g?.target_amount ?? g?.targetAmount) || 1)).length;
 
   return (
     <main className="max-w-4xl mx-auto px-4 py-8 animate-fade-in flex flex-col gap-6">
@@ -332,12 +346,15 @@ export default function Goals() {
       )}
 
       {/* Goal cards */}
-      {!loading && goals.map(goal => (
-        <GoalCard key={goal.id} goal={goal}
-                  onEdit={g => setModal({ goal: g })}
-                  onDelete={id => setDelId(id)}
-                  onOpenDeposit={g => setDeposit(g)} />
-      ))}
+      {!loading && (Array.isArray(goals) ? goals : []).map((goal, idx) => {
+        const gid = goal?.id || goal?._id || idx;
+        return (
+          <GoalCard key={gid} goal={goal}
+                    onEdit={g => setModal({ goal: g })}
+                    onDelete={id => setDelId(id)}
+                    onOpenDeposit={g => setDeposit(g)} />
+        );
+      })}
 
       {/* Modals */}
       {modal !== null && <GoalModal goal={modal.goal} onSave={handleSave} onClose={() => setModal(null)} />}

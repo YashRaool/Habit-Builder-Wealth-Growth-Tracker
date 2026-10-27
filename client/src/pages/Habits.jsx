@@ -81,32 +81,36 @@ function HabitModal({ habit, onSave, onClose }) {
 }
 
 /* ─── Single habit card ─── */
-function HabitCard({ habit, logs, onCheckin, onEdit, onDelete }) {
+function HabitCard({ habit, logs = [], onCheckin, onEdit, onDelete }) {
   const todayStr = today();
-  const todayLog = logs.find(l => l.date?.toString().slice(0,10) === todayStr);
+  const safeLogs = Array.isArray(logs) ? logs : [];
+  const todayLog = safeLogs.find(l => l?.date?.toString().slice(0,10) === todayStr);
   const doneToday = todayLog?.completed === true;
   const [checking, setChecking] = useState(false);
+  const hid = habit?.id || habit?._id;
 
   async function handleCheckin() {
     setChecking(true);
-    try { await onCheckin(habit.id); }
+    try { await onCheckin(hid); }
     finally { setChecking(false); }
   }
 
-  const maxStreak = Math.max(habit.longest_streak || 30, 30);
+  const curStreak = Number(habit?.current_streak ?? habit?.currentStreak) || 0;
+  const longStreak = Number(habit?.longest_streak ?? habit?.longestStreak) || 0;
+  const maxStreak = Math.max(longStreak, 30);
 
   return (
     <Card padding="p-5" className="flex flex-col gap-4">
       {/* Top row */}
       <div className="flex items-start gap-4">
         {/* Gauge */}
-        <StreakGauge streak={habit.current_streak} max={maxStreak} label="Streak" size={76} />
+        <StreakGauge streak={curStreak} max={maxStreak} label="Streak" size={76} />
 
         {/* Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
             <h3 className="font-bold text-base leading-tight" style={{ color: 'var(--ink)' }}>
-              {habit.name}
+              {habit?.name || habit?.title || 'Habit'}
             </h3>
             <div className="flex gap-1 shrink-0">
               <button onClick={() => onEdit(habit)}
@@ -114,7 +118,7 @@ function HabitCard({ habit, logs, onCheckin, onEdit, onDelete }) {
                       style={{ color: 'var(--coral)', background: 'rgba(242,121,61,0.1)' }}>
                 Edit
               </button>
-              <button onClick={() => onDelete(habit.id)}
+              <button onClick={() => onDelete(hid)}
                       className="text-xs px-2 py-1 rounded-lg font-semibold"
                       style={{ color: 'var(--rose)', background: 'rgba(226,87,76,0.08)' }}>
                 Del
@@ -169,13 +173,15 @@ function HabitCard({ habit, logs, onCheckin, onEdit, onDelete }) {
 }
 
 /* ─── Overall streak health gauge ─── */
-function OverallHealth({ habits, logsMap }) {
-  if (!habits.length) return null;
+function OverallHealth({ habits = [], logsMap = {} }) {
+  const list = Array.isArray(habits) ? habits : [];
+  if (!list.length) return null;
   const t = today();
-  const avgStreak = habits.reduce((s, h) => s + (h.current_streak || 0), 0) / habits.length;
-  const doneToday = habits.filter(h =>
-    (logsMap[h.id] || []).some(l => l.date?.toString().slice(0,10) === t && l.completed)
-  ).length;
+  const avgStreak = list.reduce((s, h) => s + (Number(h?.current_streak ?? h?.currentStreak) || 0), 0) / list.length;
+  const doneToday = list.filter(h => {
+    const hid = h?.id || h?._id;
+    return (logsMap[hid] || []).some(l => l?.date?.toString().slice(0,10) === t && l?.completed);
+  }).length;
 
   return (
     <Card padding="p-5" className="flex items-center gap-5">
@@ -183,7 +189,7 @@ function OverallHealth({ habits, logsMap }) {
       <div className="flex-1">
         <Card.Label>Overall Streak Health</Card.Label>
         <p className="text-stat font-bold mt-1" style={{ color: 'var(--ink)' }}>
-          {doneToday}/{habits.length} done today
+          {doneToday}/{list.length} done today
         </p>
         <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
           Avg streak: <strong style={{ color: 'var(--coral)' }}>{Math.round(avgStreak)} days</strong>
@@ -206,14 +212,31 @@ export default function Habits() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const list = await api.get('/habits');
+      const res = await api.get('/habits');
+      const list = Array.isArray(res)
+        ? res
+        : Array.isArray(res?.data?.habits)
+        ? res.data.habits
+        : Array.isArray(res?.data)
+        ? res.data
+        : [];
       setHabits(list);
+
       // Fetch logs for each habit in parallel
       const logResults = await Promise.all(
-        list.map(h => api.get(`/habits/${h.id}/logs?days=84`)) // 12 weeks
+        list.map(h => {
+          const hid = h?.id || h?._id;
+          return hid ? api.get(`/habits/${hid}/logs?days=84`).catch(() => []) : Promise.resolve([]);
+        })
       );
       const map = {};
-      list.forEach((h, i) => { map[h.id] = logResults[i]; });
+      list.forEach((h, i) => {
+        const hid = h?.id || h?._id;
+        if (hid) {
+          const lRes = logResults[i];
+          map[hid] = Array.isArray(lRes) ? lRes : (Array.isArray(lRes?.data) ? lRes.data : []);
+        }
+      });
       setLogsMap(map);
     } catch { /* silent */ }
     finally { setLoading(false); }
@@ -225,13 +248,16 @@ export default function Habits() {
   async function handleCheckin(habitId) {
     const t = today();
     const result = await api.post(`/habits/${habitId}/checkin`, {});
+    const curStreak = result?.current_streak ?? result?.currentStreak ?? 0;
+    const longStreak = result?.longest_streak ?? result?.longestStreak ?? 0;
 
     // Update habit streak counts
-    setHabits(prev => prev.map(h =>
-      h.id === habitId
-        ? { ...h, current_streak: result.current_streak, longest_streak: result.longest_streak }
-        : h
-    ));
+    setHabits(prev => (Array.isArray(prev) ? prev : []).map(h => {
+      const hid = h?.id || h?._id;
+      return hid === habitId
+        ? { ...h, current_streak: curStreak, currentStreak: curStreak, longest_streak: longStreak, longestStreak: longStreak }
+        : h;
+    }));
 
     // Toggle today's log in logsMap
     setLogsMap(prev => {
@@ -241,7 +267,7 @@ export default function Habits() {
       if (todayLog) {
         updated = existing.map(l =>
           l.date?.toString().slice(0,10) === t
-            ? { ...l, completed: result.log.completed }
+            ? { ...l, completed: Boolean(result?.log?.completed) }
             : l
         );
       } else {
@@ -253,20 +279,22 @@ export default function Habits() {
 
   /* ── Save habit (add/edit) ── */
   async function handleSave(body) {
-    if (modal?.habit) {
-      const updated = await api.put(`/habits/${modal.habit.id}`, body);
-      setHabits(prev => prev.map(h => h.id === updated.id ? { ...h, ...updated } : h));
+    const hid = modal?.habit?.id || modal?.habit?._id;
+    if (hid) {
+      const updated = await api.put(`/habits/${hid}`, body);
+      setHabits(prev => (Array.isArray(prev) ? prev : []).map(h => (h?.id === hid || h?._id === hid) ? { ...h, ...updated } : h));
     } else {
       const created = await api.post('/habits', body);
-      setHabits(prev => [...prev, created]);
-      setLogsMap(prev => ({ ...prev, [created.id]: [] }));
+      setHabits(prev => [...(Array.isArray(prev) ? prev : []), created]);
+      const createdId = created?.id || created?._id;
+      if (createdId) setLogsMap(prev => ({ ...prev, [createdId]: [] }));
     }
   }
 
   /* ── Delete ── */
   async function handleDelete(id) {
     await api.del(`/habits/${id}`);
-    setHabits(prev => prev.filter(h => h.id !== id));
+    setHabits(prev => (Array.isArray(prev) ? prev : []).filter(h => h?.id !== id && h?._id !== id));
     setLogsMap(prev => { const n = { ...prev }; delete n[id]; return n; });
     setDelId(null);
   }
@@ -319,16 +347,19 @@ export default function Habits() {
       )}
 
       {/* Habit cards */}
-      {!loading && habits.map(habit => (
-        <HabitCard
-          key={habit.id}
-          habit={habit}
-          logs={logsMap[habit.id] || []}
-          onCheckin={handleCheckin}
-          onEdit={(h) => setModal({ habit: h })}
-          onDelete={(id) => setDelId(id)}
-        />
-      ))}
+      {!loading && (Array.isArray(habits) ? habits : []).map(habit => {
+        const hid = habit?.id || habit?._id;
+        return (
+          <HabitCard
+            key={hid}
+            habit={habit}
+            logs={logsMap[hid] || []}
+            onCheckin={handleCheckin}
+            onEdit={(h) => setModal({ habit: h })}
+            onDelete={(id) => setDelId(id)}
+          />
+        );
+      })}
 
       {/* Add/Edit modal */}
       {modal !== null && (

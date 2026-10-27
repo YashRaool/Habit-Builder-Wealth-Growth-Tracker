@@ -31,9 +31,23 @@ export default function Admin() {
         api.get('/admin/feedback'),
       ]);
 
-      setStats(statsData);
-      setUsers(usersData.data || []);
-      setFeedback(feedbackData || []);
+      setStats(statsData && typeof statsData === 'object' ? (statsData.data || statsData) : {});
+      setUsers(
+        Array.isArray(usersData)
+          ? usersData
+          : Array.isArray(usersData?.data)
+          ? usersData.data
+          : Array.isArray(usersData?.data?.users)
+          ? usersData.data.users
+          : []
+      );
+      setFeedback(
+        Array.isArray(feedbackData)
+          ? feedbackData
+          : Array.isArray(feedbackData?.data)
+          ? feedbackData.data
+          : []
+      );
       setAccessDenied(false);
     } catch (err) {
       if (err.status === 403 || err.status === 401) {
@@ -52,11 +66,12 @@ export default function Admin() {
 
   /* ── Role Management ── */
   async function toggleUserRole(u) {
+    const uid = u?.id || u?._id;
     const newRole = u.role === 'admin' ? 'user' : 'admin';
-    setBusyActionId(`role-${u.id}`);
+    setBusyActionId(`role-${uid}`);
     try {
-      const updated = await api.patch(`/admin/users/${u.id}/role`, { role: newRole });
-      setUsers((prev) => prev.map((item) => (item.id === u.id ? updated : item)));
+      const updated = await api.patch(`/admin/users/${uid}/role`, { role: newRole });
+      setUsers((prev) => (Array.isArray(prev) ? prev : []).map((item) => ((item.id === uid || item._id === uid) ? { ...item, ...updated } : item)));
     } catch (err) {
       alert(err.errors?.[0] || err.error || 'Failed to update role');
     } finally {
@@ -66,12 +81,13 @@ export default function Admin() {
 
   /* ── Delete User ── */
   async function deleteUser(u) {
+    const uid = u?.id || u?._id;
     if (!window.confirm(`Are you sure you want to delete user ${u.name} (${u.email})?`)) return;
-    setBusyActionId(`del-${u.id}`);
+    setBusyActionId(`del-${uid}`);
     try {
-      await api.del(`/admin/users/${u.id}`);
-      setUsers((prev) => prev.filter((item) => item.id !== u.id));
-      if (stats) setStats((prev) => ({ ...prev, user_count: Math.max(0, prev.user_count - 1) }));
+      await api.del(`/admin/users/${uid}`);
+      setUsers((prev) => (Array.isArray(prev) ? prev : []).filter((item) => item.id !== uid && item._id !== uid));
+      if (stats) setStats((prev) => ({ ...prev, user_count: Math.max(0, (Number(prev.user_count) || 1) - 1) }));
     } catch (err) {
       alert(err.error || 'Failed to delete user');
     } finally {
@@ -81,15 +97,16 @@ export default function Admin() {
 
   /* ── Toggle Feedback Status ── */
   async function toggleFeedbackStatus(fb) {
+    const fbid = fb?.id || fb?._id;
     const newStatus = fb.status === 'open' ? 'resolved' : 'open';
-    setBusyActionId(`fb-${fb.id}`);
+    setBusyActionId(`fb-${fbid}`);
     try {
-      const updated = await api.patch(`/admin/feedback/${fb.id}`, { status: newStatus });
-      setFeedback((prev) => prev.map((item) => (item.id === fb.id ? updated : item)));
+      const updated = await api.patch(`/admin/feedback/${fbid}`, { status: newStatus });
+      setFeedback((prev) => (Array.isArray(prev) ? prev : []).map((item) => ((item.id === fbid || item._id === fbid) ? { ...item, ...updated } : item)));
       if (stats) {
         setStats((prev) => ({
           ...prev,
-          feedback_open: newStatus === 'resolved' ? Math.max(0, prev.feedback_open - 1) : prev.feedback_open + 1,
+          feedback_open: newStatus === 'resolved' ? Math.max(0, (Number(prev.feedback_open) || 1) - 1) : (Number(prev.feedback_open) || 0) + 1,
         }));
       }
     } catch (err) {
@@ -100,15 +117,15 @@ export default function Admin() {
   }
 
   /* ── Filtered Users & Feedback ── */
-  const filteredUsers = users.filter(
+  const filteredUsers = (Array.isArray(users) ? users : []).filter(
     (u) =>
-      u.name.toLowerCase().includes(searchUser.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchUser.toLowerCase())
+      (u?.name || '').toLowerCase().includes(searchUser.toLowerCase()) ||
+      (u?.email || '').toLowerCase().includes(searchUser.toLowerCase())
   );
 
-  const filteredFeedback = feedback.filter((f) => {
-    if (feedbackFilter === 'open') return f.status === 'open';
-    if (feedbackFilter === 'resolved') return f.status === 'resolved';
+  const filteredFeedback = (Array.isArray(feedback) ? feedback : []).filter((f) => {
+    if (feedbackFilter === 'open') return f?.status === 'open';
+    if (feedbackFilter === 'resolved') return f?.status === 'resolved';
     return true;
   });
 
@@ -274,13 +291,14 @@ export default function Admin() {
                     </tr>
                   ) : (
                     filteredUsers.map((u) => {
-                      const isSelf = u.id === user?.id;
-                      const isRoleBusy = busyActionId === `role-${u.id}`;
-                      const isDelBusy = busyActionId === `del-${u.id}`;
+                      const uid = u?.id || u?._id;
+                      const isSelf = uid === user?.id || uid === user?._id || u?.email === user?.email;
+                      const isRoleBusy = busyActionId === `role-${uid}`;
+                      const isDelBusy = busyActionId === `del-${uid}`;
 
                       return (
                         <tr
-                          key={u.id}
+                          key={uid}
                           className="transition-colors hover:bg-[var(--canvas)]"
                           style={{ borderBottom: '1px solid var(--border)' }}
                         >
@@ -386,13 +404,14 @@ export default function Admin() {
               </p>
             ) : (
               <div className="flex flex-col gap-3">
-                {filteredFeedback.map((fb) => {
-                  const isOpen = fb.status === 'open';
-                  const isBusy = busyActionId === `fb-${fb.id}`;
+                {filteredFeedback.map((fb, idx) => {
+                  const fbid = fb?.id || fb?._id || idx;
+                  const isOpen = fb?.status === 'open';
+                  const isBusy = busyActionId === `fb-${fbid}`;
 
                   return (
                     <div
-                      key={fb.id}
+                      key={fbid}
                       className="p-4 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all"
                       style={{ background: 'var(--canvas)', border: '1px solid var(--border)' }}
                     >

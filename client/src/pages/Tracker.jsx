@@ -143,16 +143,21 @@ function CatPill({ label, type }) {
 }
 
 /* ─── Summary stat cards ─── */
-function SummaryCards({ income, expenses, prevIncome, prevExpenses }) {
-  const net = income - expenses;
-  const prevNet = prevIncome - prevExpenses;
-  const incomeDelta  = prevIncome  ? ((income   - prevIncome)  / prevIncome  * 100).toFixed(1) : null;
-  const expDelta     = prevExpenses? ((expenses - prevExpenses)/ prevExpenses* 100).toFixed(1) : null;
-  const netDelta     = prevNet !== 0 ? ((net - prevNet) / Math.abs(prevNet) * 100).toFixed(1) : null;
+function SummaryCards({ income = 0, expenses = 0, prevIncome = 0, prevExpenses = 0 }) {
+  const inc = Number(income) || 0;
+  const exp = Number(expenses) || 0;
+  const pInc = Number(prevIncome) || 0;
+  const pExp = Number(prevExpenses) || 0;
+
+  const net = inc - exp;
+  const prevNet = pInc - pExp;
+  const incomeDelta = pInc ? (((inc - pInc) / pInc) * 100).toFixed(1) : null;
+  const expDelta = pExp ? (((exp - pExp) / pExp) * 100).toFixed(1) : null;
+  const netDelta = (prevNet !== 0) ? (((net - prevNet) / Math.abs(prevNet)) * 100).toFixed(1) : null;
 
   const stats = [
-    { label: 'Income this month',   value: fmt(income),   delta: incomeDelta,  up: Number(incomeDelta)  >= 0 },
-    { label: 'Expenses this month', value: fmt(expenses), delta: expDelta,     up: Number(expDelta)     <  0 },
+    { label: 'Income this month',   value: fmt(inc),   delta: incomeDelta,  up: Number(incomeDelta)  >= 0 },
+    { label: 'Expenses this month', value: fmt(exp), delta: expDelta,     up: Number(expDelta)     <  0 },
     { label: 'Net cashflow',        value: fmt(net),      delta: netDelta,     up: Number(net)          >= 0, color: net >= 0 ? 'var(--mint)' : 'var(--rose)' },
   ];
 
@@ -192,8 +197,8 @@ export default function Tracker() {
         api.get('/income?limit=200'),
         api.get('/expenses?limit=200'),
       ]);
-      setIncomeData(inc.data || []);
-      setExpenseData(exp.data || []);
+      setIncomeData(Array.isArray(inc) ? inc : (inc?.data || []));
+      setExpenseData(Array.isArray(exp) ? exp : (exp?.data || []));
     } catch { /* silent */ }
     finally { setLoading(false); }
   }, []);
@@ -208,8 +213,9 @@ export default function Tracker() {
     const preM = `${prev.getFullYear()}-${String(prev.getMonth()+1).padStart(2,'0')}`;
 
     const monthTotal = (arr, m) =>
-      arr.filter(r => r.date?.toString().slice(0,7) === m)
-         .reduce((s, r) => s + Number(r.amount), 0);
+      (Array.isArray(arr) ? arr : [])
+         .filter(r => r && r.date?.toString().slice(0,7) === m)
+         .reduce((s, r) => s + (Number(r?.amount) || 0), 0);
 
     return {
       income:       monthTotal(incomeData,  curM),
@@ -220,11 +226,13 @@ export default function Tracker() {
   }, [incomeData, expenseData]);
 
   /* ── Active dataset ── */
-  const activeData = activeTab === 'income' ? incomeData : expenseData;
+  const activeData = Array.isArray(activeTab === 'income' ? incomeData : expenseData)
+    ? (activeTab === 'income' ? incomeData : expenseData)
+    : [];
 
   /* ── Categories for filter ── */
   const cats = useMemo(() => {
-    const s = new Set(activeData.map(r => r.category || r.source));
+    const s = new Set(activeData.map(r => r?.category || r?.source).filter(Boolean));
     return ['All', ...s];
   }, [activeData]);
 
@@ -237,13 +245,13 @@ export default function Tracker() {
       d = d.filter(r =>
         (r.category || r.source || '').toLowerCase().includes(q) ||
         (r.note || '').toLowerCase().includes(q) ||
-        String(r.amount).includes(q)
+        String(r.amount || '').includes(q)
       );
     }
     d.sort((a, b) => {
       let av = a[sortKey], bv = b[sortKey];
-      if (sortKey === 'amount') { av = Number(av); bv = Number(bv); }
-      else if (sortKey === 'date') { av = new Date(av); bv = new Date(bv); }
+      if (sortKey === 'amount') { av = Number(av) || 0; bv = Number(bv) || 0; }
+      else if (sortKey === 'date') { av = new Date(av || 0); bv = new Date(bv || 0); }
       if (av < bv) return sortDir === 'asc' ? -1 : 1;
       if (av > bv) return sortDir === 'asc' ?  1 : -1;
       return 0;
@@ -261,16 +269,17 @@ export default function Tracker() {
   /* ── CRUD handlers ── */
   async function handleSave(body) {
     const { type, record } = modal;
-    if (record) {
-      const updated = await api.put(`/${type === 'income' ? 'income' : 'expenses'}/${record.id}`, body);
+    const recId = record?.id || record?._id;
+    if (recId) {
+      const updated = await api.put(`/${type === 'income' ? 'income' : 'expenses'}/${recId}`, body);
       type === 'income'
-        ? setIncomeData(d => d.map(r => r.id === updated.id ? updated : r))
-        : setExpenseData(d => d.map(r => r.id === updated.id ? updated : r));
+        ? setIncomeData(d => (Array.isArray(d) ? d : []).map(r => (r.id === recId || r._id === recId) ? updated : r))
+        : setExpenseData(d => (Array.isArray(d) ? d : []).map(r => (r.id === recId || r._id === recId) ? updated : r));
     } else {
       const created = await api.post(`/${type === 'income' ? 'income' : 'expenses'}`, body);
       type === 'income'
-        ? setIncomeData(d => [created, ...d])
-        : setExpenseData(d => [created, ...d]);
+        ? setIncomeData(d => [created, ...(Array.isArray(d) ? d : [])])
+        : setExpenseData(d => [created, ...(Array.isArray(d) ? d : [])]);
     }
   }
 
@@ -278,8 +287,8 @@ export default function Tracker() {
     const path = activeTab === 'income' ? 'income' : 'expenses';
     await api.del(`/${path}/${id}`);
     activeTab === 'income'
-      ? setIncomeData(d => d.filter(r => r.id !== id))
-      : setExpenseData(d => d.filter(r => r.id !== id));
+      ? setIncomeData(d => (Array.isArray(d) ? d : []).filter(r => r.id !== id && r._id !== id))
+      : setExpenseData(d => (Array.isArray(d) ? d : []).filter(r => r.id !== id && r._id !== id));
     setDeleteConfirm(null);
   }
 

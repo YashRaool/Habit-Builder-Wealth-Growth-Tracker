@@ -7,10 +7,13 @@
 const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 function getGrid(logs, weeks) {
+  const safeLogs = Array.isArray(logs) ? logs : [];
+  const safeWeeks = Number(weeks) || 12;
   const logMap = {};
-  for (const l of logs) {
+  for (const l of safeLogs) {
+    if (!l) continue;
     const key = l.date?.toString().slice(0, 10);
-    if (key) logMap[key] = l.completed;
+    if (key) logMap[key] = Boolean(l.completed);
   }
 
   // Build a full weeks×7 grid ending today
@@ -22,7 +25,7 @@ function getGrid(logs, weeks) {
   endDate.setDate(endDate.getDate() + (6 - dayOfWeek));
 
   const cells = [];
-  for (let w = weeks - 1; w >= 0; w--) {
+  for (let w = safeWeeks - 1; w >= 0; w--) {
     const col = [];
     for (let d = 0; d <= 6; d++) {
       const date = new Date(endDate);
@@ -40,8 +43,10 @@ function getGrid(logs, weeks) {
 }
 
 export default function HabitHeatmap({ logs = [], weeks = 12 }) {
-  const grid = getGrid(logs, weeks);
-  const completedCount = logs.filter(l => l.completed).length;
+  const safeLogs = Array.isArray(logs) ? logs : [];
+  const safeWeeks = Number(weeks) || 12;
+  const grid = getGrid(safeLogs, safeWeeks);
+  const completedCount = safeLogs.filter(l => l && l.completed).length;
 
   return (
     <div>

@@ -11,9 +11,13 @@ const errorHandler = require('./src/middleware/errorHandler');
 // Route imports
 const authRoutes = require('./src/routes/auth');
 const userRoutes = require('./src/routes/users');
+const incomeRoutes = require('./src/routes/income');
+const expenseRoutes = require('./src/routes/expenses');
+const investmentRoutes = require('./src/routes/investments');
 const transactionRoutes = require('./src/routes/transactions');
 const habitRoutes = require('./src/routes/habits');
 const goalRoutes = require('./src/routes/goals');
+const analyticsRoutes = require('./src/routes/analytics');
 const wealthRoutes = require('./src/routes/wealth');
 const adminRoutes = require('./src/routes/admin');
 
@@ -73,9 +77,13 @@ app.get('/api/health', (_req, res) => {
 // Mount routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/income', incomeRoutes);
+app.use('/api/expenses', expenseRoutes);
+app.use('/api/investments', investmentRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/habits', habitRoutes);
 app.use('/api/goals', goalRoutes);
+app.use('/api/analytics', analyticsRoutes);
 app.use('/api/wealth', wealthRoutes);
 app.use('/api/admin', adminRoutes);
 

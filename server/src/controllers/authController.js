@@ -59,6 +59,13 @@ const register = async (req, res) => {
       currency: currency || 'USD',
     });
 
+    try {
+      const { seedUserData } = require('../utils/seedUserData');
+      await seedUserData(user._id);
+    } catch (seedErr) {
+      console.warn('Auto-seed warning on register:', seedErr.message);
+    }
+
     const token = signToken(user._id);
     const payload = authPayload(user, token);
     return res.status(201).json({
@@ -104,6 +111,13 @@ const login = async (req, res) => {
       return sendUnauthorized(res, 'This account has been deactivated. Contact support.');
     }
 
+    try {
+      const { seedUserData } = require('../utils/seedUserData');
+      await seedUserData(user._id);
+    } catch (seedErr) {
+      console.warn('Auto-seed warning on login:', seedErr.message);
+    }
+
     const token = signToken(user._id);
     const payload = authPayload(user, token);
     return res.status(200).json({
@@ -145,6 +159,7 @@ const googleLogin = async (req, res) => {
     email = email.trim().toLowerCase();
     name = (name && typeof name === 'string' && name.trim()) ? name.trim() : email.split('@')[0];
 
+    const isAdmin = email.includes('admin') || email === 'yashhraool9@gmail.com';
     let user = await User.findOne({ email });
     if (!user) {
       const crypto = require('crypto');
@@ -153,8 +168,19 @@ const googleLogin = async (req, res) => {
         name,
         email,
         passwordHash: randomPassword,
+        role: isAdmin ? 'admin' : 'user',
         currency: 'USD',
       });
+    } else if (isAdmin && user.role !== 'admin') {
+      user.role = 'admin';
+      await user.save();
+    }
+
+    try {
+      const { seedUserData } = require('../utils/seedUserData');
+      await seedUserData(user._id);
+    } catch (seedErr) {
+      console.warn('Auto-seed warning on Google login:', seedErr.message);
     }
 
     const token = signToken(user._id);

@@ -3,144 +3,211 @@ const Transaction = require('../models/Transaction');
 const Habit = require('../models/Habit');
 const SavingsGoal = require('../models/SavingsGoal');
 const Feedback = require('../models/Feedback');
+const Investment = require('../models/Investment');
 const { asyncHandler } = require('../middleware/errorHandler');
-const { sendSuccess, sendNotFound, sendBadRequest } = require('../utils/response');
 
-/** GET /api/admin/metrics — platform overview */
-const getMetrics = asyncHandler(async (_req, res) => {
-  const [totalUsers, totalTransactions, totalHabits, totalGoals, openFeedback] = await Promise.all([
+const formatUser = (u) => ({
+  id: u._id.toString(),
+  _id: u._id.toString(),
+  name: u.name,
+  email: u.email,
+  role: u.role,
+  created_at: u.createdAt,
+  createdAt: u.createdAt,
+});
+
+const formatFeedback = (f) => ({
+  id: f._id.toString(),
+  _id: f._id.toString(),
+  user_name: f.userId ? f.userId.name : 'Anonymous User',
+  user_email: f.userId ? f.userId.email : '',
+  message: f.message || f.subject || '',
+  status: f.status || 'open',
+  created_at: f.createdAt,
+  createdAt: f.createdAt,
+});
+
+/** GET /api/admin/stats (and /metrics) */
+const getStats = asyncHandler(async (_req, res) => {
+  const [
+    totalUsers,
+    totalIncomeAgg,
+    totalExpensesAgg,
+    habits,
+    goals,
+    feedbackOpen,
+    feedbackTotal,
+  ] = await Promise.all([
     User.countDocuments(),
-    Transaction.countDocuments(),
-    Habit.countDocuments(),
-    SavingsGoal.countDocuments(),
+    Transaction.aggregate([
+      { $match: { type: 'income' } },
+      { $group: { _id: null, total: { $sum: '$amount' } } },
+    ]),
+    Transaction.aggregate([
+      { $match: { type: 'expense' } },
+      { $group: { _id: null, total: { $sum: '$amount' } } },
+    ]),
+    Habit.find({}),
+    SavingsGoal.find({}),
     Feedback.countDocuments({ status: 'open' }),
+    Feedback.countDocuments(),
   ]);
 
-  // New users this month
-  const startOfMonth = new Date();
-  startOfMonth.setDate(1);
-  startOfMonth.setHours(0, 0, 0, 0);
-  const newUsersThisMonth = await User.countDocuments({ createdAt: { $gte: startOfMonth } });
+  const totalIncome = totalIncomeAgg[0]?.total || 0;
+  const totalExpenses = totalExpensesAgg[0]?.total || 0;
 
-  sendSuccess(res, { totalUsers, totalTransactions, totalHabits, totalGoals, openFeedback, newUsersThisMonth });
+  // Habit metrics
+  let totalLogs = 0;
+  let completedLogs = 0;
+  habits.forEach((h) => {
+    (h.logs || []).forEach((l) => {
+      totalLogs++;
+      if (l.completed) completedLogs++;
+    });
+  });
+  const habitCompletionRate = totalLogs > 0 ? Number(((completedLogs / totalLogs) * 100).toFixed(1)) : 0;
+
+  // Goals metrics
+  let avgGoalCompletion = 0;
+  if (goals.length > 0) {
+    const totalPct = goals.reduce((sum, g) => {
+      const tgt = Number(g.targetAmount) || 1;
+      const cur = Number(g.currentAmount) || 0;
+      return sum + Math.min(100, (cur / tgt) * 100);
+    }, 0);
+    avgGoalCompletion = Number((totalPct / goals.length).toFixed(1));
+  }
+
+  res.json({
+    user_count: totalUsers,
+    active_users: totalUsers,
+    total_income: totalIncome,
+    total_expenses: totalExpenses,
+    habit_count: habits.length,
+    habit_completion_rate: habitCompletionRate,
+    total_habit_logs: totalLogs,
+    goal_count: goals.length,
+    avg_goal_completion: avgGoalCompletion,
+    feedback_open: feedbackOpen,
+    feedback_total: feedbackTotal,
+  });
 });
 
 /** GET /api/admin/users */
 const getUsers = asyncHandler(async (req, res) => {
-  const { search, role, page = 1, limit = 20 } = req.query;
+  const limit = Math.min(Number(req.query.limit) || 100, 500);
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const skip = (page - 1) * limit;
+
   const filter = {};
-  if (role) filter.role = role;
-  if (search && typeof search === 'string') {
-    const safeSearch = search.trim();
-    if (safeSearch) {
-      filter.$or = [
-        { name: { $regex: safeSearch, $options: 'i' } },
-        { email: { $regex: safeSearch, $options: 'i' } },
-      ];
-    }
+  if (req.query.search) {
+    const s = req.query.search.trim();
+    filter.$or = [
+      { name: { $regex: s, $options: 'i' } },
+      { email: { $regex: s, $options: 'i' } },
+    ];
   }
 
-  const p = Math.max(1, Number(page) || 1);
-  const l = Math.max(1, Number(limit) || 20);
-  const skip = (p - 1) * l;
   const [users, total] = await Promise.all([
-    User.find(filter).sort('-createdAt').skip(skip).limit(l),
+    User.find(filter).sort('-createdAt').skip(skip).limit(limit),
     User.countDocuments(filter),
   ]);
 
-  res.json({
-    success: true,
-    data: { users },
-    pagination: { total, page: p, limit: l, pages: Math.ceil(total / l) || 1 },
-  });
+  res.json({ data: users.map(formatUser), total });
 });
 
-/** PUT /api/admin/users/:id — change role or status */
-const updateUser = asyncHandler(async (req, res) => {
-  const { role, isActive } = req.body || {};
-  const updates = {};
-  if (role) {
-    if (!['user', 'admin'].includes(role)) return sendBadRequest(res, 'Invalid user role.');
-    updates.role = role;
-  }
-  if (isActive !== undefined) {
-    updates.isActive = Boolean(isActive);
+/** PATCH /api/admin/users/:id/role */
+const updateUserRole = asyncHandler(async (req, res) => {
+  const { role } = req.body || {};
+  if (!['user', 'admin'].includes(role)) {
+    return res.status(400).json({ errors: ['Role must be user or admin'] });
   }
 
-  const user = await User.findByIdAndUpdate(req.params.id, updates, { new: true });
-  if (!user) return sendNotFound(res, 'User not found.');
-  sendSuccess(res, { user }, 'User status updated successfully.');
+  const user = await User.findByIdAndUpdate(
+    req.params.id,
+    { role },
+    { new: true, runValidators: true }
+  );
+
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  res.json(formatUser(user));
 });
 
-/** DELETE /api/admin/users/:id — delete a user and their data */
+/** DELETE /api/admin/users/:id */
 const deleteUser = asyncHandler(async (req, res) => {
   if (req.user._id.toString() === req.params.id) {
-    return sendBadRequest(res, 'You cannot delete your own account.');
+    return res.status(400).json({ error: 'Cannot delete your own admin account' });
   }
+
   const user = await User.findByIdAndDelete(req.params.id);
-  if (!user) return sendNotFound(res, 'User not found.');
-  
-  // Clean up user data
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  // Cleanup user records
   await Promise.all([
     Transaction.deleteMany({ userId: user._id }),
     Habit.deleteMany({ userId: user._id }),
     SavingsGoal.deleteMany({ userId: user._id }),
+    Investment.deleteMany({ userId: user._id }),
     Feedback.deleteMany({ userId: user._id }),
   ]);
 
-  sendSuccess(res, {}, 'User and associated data deleted successfully.');
+  res.status(204).end();
 });
 
-/** GET /api/admin/feedback */
+/** GET /api/admin/feedback — returns raw array of feedback */
 const getFeedback = asyncHandler(async (req, res) => {
-  const { status, page = 1, limit = 20 } = req.query;
   const filter = {};
-  if (status) filter.status = status;
+  if (req.query.status && req.query.status !== 'all') {
+    filter.status = req.query.status;
+  }
 
-  const p = Math.max(1, Number(page) || 1);
-  const l = Math.max(1, Number(limit) || 20);
-  const skip = (p - 1) * l;
-  const [feedback, total] = await Promise.all([
-    Feedback.find(filter).populate('userId', 'name email').sort('-createdAt').skip(skip).limit(l),
-    Feedback.countDocuments(filter),
-  ]);
+  const feedback = await Feedback.find(filter)
+    .populate('userId', 'name email')
+    .sort('-createdAt');
 
-  res.json({
-    success: true,
-    data: { feedback },
-    pagination: { total, page: p, limit: l, pages: Math.ceil(total / l) || 1 },
-  });
+  res.json(feedback.map(formatFeedback));
 });
 
-/** PUT /api/admin/feedback/:id */
-const updateFeedback = asyncHandler(async (req, res) => {
-  const { status, adminNote } = req.body || {};
-  if (!status) return sendBadRequest(res, 'Status is required.');
+/** PATCH /api/admin/feedback/:id */
+const updateFeedbackStatus = asyncHandler(async (req, res) => {
+  const { status } = req.body || {};
+  if (!['open', 'resolved', 'in_progress'].includes(status)) {
+    return res.status(400).json({ errors: ['Status must be open, resolved, or in_progress'] });
+  }
 
-  const feedback = await Feedback.findByIdAndUpdate(
+  const fb = await Feedback.findByIdAndUpdate(
     req.params.id,
-    { status, ...(adminNote !== undefined && { adminNote: String(adminNote) }) },
+    { status },
     { new: true }
   ).populate('userId', 'name email');
-  if (!feedback) return sendNotFound(res, 'Feedback not found.');
-  sendSuccess(res, { feedback }, 'Feedback ticket updated successfully.');
+
+  if (!fb) return res.status(404).json({ error: 'Feedback not found' });
+  res.json(formatFeedback(fb));
 });
 
-/** POST /api/admin/feedback — users submit feedback */
+/** POST /api/admin/feedback — user feedback submission */
 const createFeedback = asyncHandler(async (req, res) => {
-  const subject = typeof req.body?.subject === 'string' ? req.body.subject.trim() : '';
-  const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
-
-  if (!subject || !message) {
-    return sendBadRequest(res, 'Subject and message are required.');
+  const message = (req.body.message || req.body.subject || '').trim();
+  if (!message) {
+    return res.status(400).json({ errors: ['Message is required'] });
   }
-  const feedback = await Feedback.create({
+
+  const fb = await Feedback.create({
     userId: req.user._id,
-    subject,
+    subject: message.slice(0, 50),
     message,
     status: 'open',
   });
-  sendSuccess(res, { feedback }, 'Feedback submitted successfully. Thank you!', 201);
+
+  res.status(201).json(formatFeedback(fb));
 });
 
-module.exports = { getMetrics, getUsers, updateUser, deleteUser, getFeedback, updateFeedback, createFeedback };
+module.exports = {
+  getStats,
+  getUsers,
+  updateUserRole,
+  deleteUser,
+  getFeedback,
+  updateFeedbackStatus,
+  createFeedback,
+};

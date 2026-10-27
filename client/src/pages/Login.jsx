@@ -413,6 +413,16 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Pre-warm backend while user is on login page
+  useEffect(() => {
+    const apiBase =
+      import.meta.env.VITE_API_URL ||
+      (import.meta.env.DEV
+        ? '/api'
+        : 'https://wealthhabit-backend.onrender.com/api');
+    fetch(`${apiBase}/health`, { method: 'GET', cache: 'no-cache' }).catch(() => {});
+  }, []);
+
   const [tab, setTab] = useState(
     location.pathname.endsWith('/register') || location.state?.register ? 'register' : 'login'
   );

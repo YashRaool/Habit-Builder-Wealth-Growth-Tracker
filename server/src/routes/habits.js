@@ -1,6 +1,12 @@
 const router = require('express').Router();
 const {
-  getHabits, getHabit, createHabit, updateHabit, deleteHabit, checkIn, getHistory,
+  getHabits,
+  getHabit,
+  createHabit,
+  updateHabit,
+  deleteHabit,
+  getLogs,
+  checkIn,
 } = require('../controllers/habitController');
 const { protect } = require('../middleware/auth');
 
@@ -11,6 +17,7 @@ router.get('/:id', getHabit);
 router.put('/:id', updateHabit);
 router.delete('/:id', deleteHabit);
 router.post('/:id/checkin', checkIn);
-router.get('/:id/history', getHistory);
+router.get('/:id/logs', getLogs);
+router.get('/:id/history', getLogs);
 
 module.exports = router;

@@ -397,22 +397,27 @@ export default function Dashboard() {
         api.get('/goals'),
       ]);
 
-      setHistory(histRes || []);
-      setBreakdown(bdRes || null);
-      setIncomeList(incRes.data || []);
-      setExpenseList(expRes.data || []);
-      setHabits(habRes || []);
-      setGoals(goalRes || []);
+      const safeHist = Array.isArray(histRes) ? histRes : (Array.isArray(histRes?.data) ? histRes.data : []);
+      const safeHabits = Array.isArray(habRes) ? habRes : (Array.isArray(habRes?.data?.habits) ? habRes.data.habits : (Array.isArray(habRes?.data) ? habRes.data : []));
+      const safeGoals = Array.isArray(goalRes) ? goalRes : (Array.isArray(goalRes?.data?.goals) ? goalRes.data.goals : (Array.isArray(goalRes?.data) ? goalRes.data : []));
+
+      setHistory(safeHist);
+      setBreakdown(bdRes && typeof bdRes === 'object' ? (bdRes.data || bdRes) : {});
+      setIncomeList(Array.isArray(incRes) ? incRes : (Array.isArray(incRes?.data) ? incRes.data : []));
+      setExpenseList(Array.isArray(expRes) ? expRes : (Array.isArray(expRes?.data) ? expRes.data : []));
+      setHabits(safeHabits);
+      setGoals(safeGoals);
 
       // Fetch logs for habits for today's checkin status
-      if (Array.isArray(habRes) && habRes.length > 0) {
+      if (safeHabits.length > 0) {
         const logEntries = await Promise.all(
-          habRes.map(async (h) => {
+          safeHabits.map(async (h) => {
+            const hid = h?.id || h?._id;
             try {
-              const logs = await api.get(`/habits/${h.id}/logs?days=30`);
-              return [h.id, logs];
+              const logs = await api.get(`/habits/${hid}/logs?days=30`);
+              return [hid, Array.isArray(logs) ? logs : (Array.isArray(logs?.data) ? logs.data : [])];
             } catch {
-              return [h.id, []];
+              return [hid, []];
             }
           })
         );
@@ -432,9 +437,9 @@ export default function Dashboard() {
   }, [fetchAllData]);
 
   /* ── Net Worth Calculations (Matches Analytics & Tracker) ── */
-  /* ── Net Worth Calculations (Matches Analytics & Tracker) ── */
-  const latestNW = history.length > 0 ? Number(history[history.length - 1].net_worth) : 0;
-  const prevNW = history.length > 1 ? Number(history[history.length - 2].net_worth) : null;
+  const safeHistory = Array.isArray(history) ? history : [];
+  const latestNW = safeHistory.length > 0 ? (Number(safeHistory[safeHistory.length - 1]?.net_worth) || 0) : 0;
+  const prevNW = safeHistory.length > 1 ? (Number(safeHistory[safeHistory.length - 2]?.net_worth) || 0) : null;
   const nwDelta = (prevNW !== null && prevNW !== 0) 
     ? (((latestNW - prevNW) / Math.abs(prevNW)) * 100).toFixed(1) 
     : null;
@@ -466,18 +471,21 @@ export default function Dashboard() {
     setCheckingHabitId(habitId);
     try {
       const res = await api.post(`/habits/${habitId}/checkin`);
+      const curStreak = res?.current_streak ?? res?.currentStreak ?? 0;
+      const longStreak = res?.longest_streak ?? res?.longestStreak ?? 0;
       // Update habit streak in local habits list
       setHabits((prev) =>
-        prev.map((h) =>
-          h.id === habitId
-            ? { ...h, current_streak: res.current_streak, longest_streak: res.longest_streak }
-            : h
-        )
+        (Array.isArray(prev) ? prev : []).map((h) => {
+          const hid = h?.id || h?._id;
+          return hid === habitId
+            ? { ...h, current_streak: curStreak, currentStreak: curStreak, longest_streak: longStreak, longestStreak: longStreak }
+            : h;
+        })
       );
 
       // Refresh logs for this habit
       const logs = await api.get(`/habits/${habitId}/logs?days=30`);
-      setHabitLogs((prev) => ({ ...prev, [habitId]: logs }));
+      setHabitLogs((prev) => ({ ...prev, [habitId]: Array.isArray(logs) ? logs : (Array.isArray(logs?.data) ? logs.data : []) }));
     } catch {
       /* silent */
     } finally {

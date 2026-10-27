@@ -188,8 +188,8 @@ export default function Analytics() {
         api.get('/analytics/net-worth-history?months=6'),
         api.get('/analytics/breakdown'),
       ]);
-      setHistory(hist);
-      setBreakdown(bd);
+      setHistory(Array.isArray(hist) ? hist : (Array.isArray(hist?.data) ? hist.data : []));
+      setBreakdown(bd && typeof bd === 'object' ? (bd.data || bd) : {});
     } catch { /* silent */ }
     finally { setLoading(false); }
   }, []);
@@ -197,42 +197,45 @@ export default function Analytics() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   /* ─── Derived stats ─── */
-  const latestNW   = history.length > 0 ? Number(history[history.length - 1].net_worth) : 0;
-  const prevNW     = history.length > 1 ? Number(history[history.length - 2].net_worth) : null;
+  const safeHistory = Array.isArray(history) ? history : [];
+  const latestNW   = safeHistory.length > 0 ? (Number(safeHistory[safeHistory.length - 1]?.net_worth) || 0) : 0;
+  const prevNW     = safeHistory.length > 1 ? (Number(safeHistory[safeHistory.length - 2]?.net_worth) || 0) : null;
   const nwDelta    = (prevNW !== null && prevNW !== 0) ? (((latestNW - prevNW) / Math.abs(prevNW)) * 100).toFixed(1) : null;
 
-  const latestRate = breakdown?.savingsRate?.length
-    ? Number(breakdown.savingsRate[breakdown.savingsRate.length - 1].rate)
+  const safeSavingsRate = Array.isArray(breakdown?.savingsRate) ? breakdown.savingsRate : [];
+  const latestRate = safeSavingsRate.length
+    ? (Number(safeSavingsRate[safeSavingsRate.length - 1]?.rate) || 0)
     : 0;
 
-  const totalInvestments = breakdown?.investments?.reduce((s, r) => s + Number(r.total), 0) || 0;
+  const safeInvestments = Array.isArray(breakdown?.investments) ? breakdown.investments : [];
+  const totalInvestments = safeInvestments.reduce((s, r) => s + (Number(r?.total) || 0), 0);
 
   /* ─── Investment pie data ─── */
   const pieData = useMemo(() =>
-    (breakdown?.investments || []).map(r => ({
-      name: TYPE_LABELS[r.type] || r.type,
-      value: Number(r.total),
-      type: r.type,
+    (Array.isArray(breakdown?.investments) ? breakdown.investments : []).map(r => ({
+      name: TYPE_LABELS[r?.type] || r?.type || 'Other',
+      value: Number(r?.total) || 0,
+      type: r?.type || 'investment',
     })),
     [breakdown]
   );
 
   /* ─── Expense bar data ─── */
   const expenseData = useMemo(() =>
-    (breakdown?.expensesByCategory || []).map(r => ({
-      category: r.category,
-      total: Number(r.total),
+    (Array.isArray(breakdown?.expensesByCategory) ? breakdown.expensesByCategory : []).map(r => ({
+      category: r?.category || 'Other',
+      total: Number(r?.total) || 0,
     })),
     [breakdown]
   );
 
   /* ─── Savings rate data ─── */
   const rateData = useMemo(() =>
-    (breakdown?.savingsRate || []).map(r => ({
-      month: r.month,
-      rate: Number(r.rate),
-      income: Number(r.income),
-      expenses: Number(r.expenses),
+    (Array.isArray(breakdown?.savingsRate) ? breakdown.savingsRate : []).map(r => ({
+      month: r?.month || '',
+      rate: Number(r?.rate) || 0,
+      income: Number(r?.income) || 0,
+      expenses: Number(r?.expenses) || 0,
       target: 20,
     })),
     [breakdown]

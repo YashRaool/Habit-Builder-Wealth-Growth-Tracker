@@ -1,20 +1,32 @@
 const router = require('express').Router();
-const { getMetrics, getUsers, updateUser, deleteUser, getFeedback, updateFeedback, createFeedback } = require('../controllers/adminController');
+const {
+  getStats,
+  getUsers,
+  updateUserRole,
+  deleteUser,
+  getFeedback,
+  updateFeedbackStatus,
+  createFeedback,
+} = require('../controllers/adminController');
 const { protect } = require('../middleware/auth');
 const { authorize } = require('../middleware/rbac');
 
 router.use(protect);
 
-// Any authenticated user can submit feedback
+// Users can submit feedback
 router.post('/feedback', createFeedback);
 
-// Admin-only routes
+// Admin-only endpoints
 router.use(authorize('admin'));
-router.get('/metrics', getMetrics);
+router.get('/stats', getStats);
+router.get('/metrics', getStats);
 router.get('/users', getUsers);
-router.put('/users/:id', updateUser);
+router.patch('/users/:id/role', updateUserRole);
+router.put('/users/:id/role', updateUserRole);
+router.put('/users/:id', updateUserRole);
 router.delete('/users/:id', deleteUser);
 router.get('/feedback', getFeedback);
-router.put('/feedback/:id', updateFeedback);
+router.patch('/feedback/:id', updateFeedbackStatus);
+router.put('/feedback/:id', updateFeedbackStatus);
 
 module.exports = router;

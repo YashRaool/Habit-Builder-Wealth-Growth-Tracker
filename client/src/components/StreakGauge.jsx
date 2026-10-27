@@ -16,11 +16,14 @@ export default function StreakGauge({
   showText = true,
   strokeWidth,
 }) {
-  const sw     = strokeWidth ?? Math.max(3, size * 0.07);
-  const r      = (size / 2) - sw;
-  const circ   = 2 * Math.PI * r;
-  const pct    = Math.min(Math.max(streak / max, 0), 1);
-  const offset = circ * (1 - pct);
+  const safeStreak = Math.max(0, Number(streak) || 0);
+  const safeMax = Math.max(1, Number(max) || 30);
+  const safeSize = Number(size) || 80;
+  const sw = Number(strokeWidth) || Math.max(3, safeSize * 0.07);
+  const r = Math.max(1, (safeSize / 2) - sw);
+  const circ = 2 * Math.PI * r;
+  const pct = Math.min(Math.max(safeStreak / safeMax, 0), 1);
+  const offset = isNaN(circ * (1 - pct)) ? 0 : circ * (1 - pct);
 
   // Color shifts coral→mint when >80%
   const fillColor = pct >= 0.8 ? 'var(--mint)' : 'var(--coral)';

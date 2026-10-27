@@ -1,8 +1,10 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { AuthProvider } from '@/context/AuthContext';
 import Nav from '@/components/Nav';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 // Pages
 import Login     from '@/pages/Login';
@@ -18,6 +20,16 @@ function Protected({ children, adminOnly = false }) {
 }
 
 export default function App() {
+  // Immediate silent background pre-warm against Render cold starts
+  useEffect(() => {
+    const apiBase =
+      import.meta.env.VITE_API_URL ||
+      (import.meta.env.DEV
+        ? '/api'
+        : 'https://wealthhabit-backend.onrender.com/api');
+    fetch(`${apiBase}/health`, { method: 'GET', cache: 'no-cache' }).catch(() => {});
+  }, []);
+
   return (
     <ThemeProvider>
       <BrowserRouter basename={import.meta.env.BASE_URL}>
@@ -28,27 +40,29 @@ export default function App() {
           >
             <Nav />
 
-            <Routes>
-              {/* Default redirect */}
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <ErrorBoundary>
+              <Routes>
+                {/* Default redirect */}
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
-              {/* Public auth page */}
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Login />} />
+                {/* Public auth page */}
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Login />} />
 
-              {/* Protected app pages */}
-              <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
-              <Route path="/tracker"   element={<Protected><Tracker /></Protected>} />
-              <Route path="/habits"    element={<Protected><Habits /></Protected>} />
-              <Route path="/goals"     element={<Protected><Goals /></Protected>} />
-              <Route path="/analytics" element={<Protected><Analytics /></Protected>} />
+                {/* Protected app pages */}
+                <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
+                <Route path="/tracker"   element={<Protected><Tracker /></Protected>} />
+                <Route path="/habits"    element={<Protected><Habits /></Protected>} />
+                <Route path="/goals"     element={<Protected><Goals /></Protected>} />
+                <Route path="/analytics" element={<Protected><Analytics /></Protected>} />
 
-              {/* Admin-only */}
-              <Route path="/admin" element={<Protected adminOnly><Admin /></Protected>} />
+                {/* Admin-only */}
+                <Route path="/admin" element={<Protected adminOnly><Admin /></Protected>} />
 
-              {/* 404 */}
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
-            </Routes>
+                {/* 404 */}
+                <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              </Routes>
+            </ErrorBoundary>
           </div>
         </AuthProvider>
       </BrowserRouter>
