@@ -21,6 +21,20 @@ WealthHabit bridges the critical gap between daily financial micro-habits and lo
 
 ---
 
+### 🚀 Live Production & Evaluator Access
+
+| Resource | URL | Status |
+| :--- | :--- | :--- |
+| **Live Web App** | [https://yashraool.github.io/Habit-Builder-Wealth-Growth-Tracker/login](https://yashraool.github.io/Habit-Builder-Wealth-Growth-Tracker/login) | ![Active](https://img.shields.io/badge/Status-Online-brightgreen?style=flat-square) |
+| **Backend API** | [https://wealthhabit-backend.onrender.com/api/health](https://wealthhabit-backend.onrender.com/api/health) | ![Active](https://img.shields.io/badge/Status-Live_Render-blue?style=flat-square) |
+
+#### 🔑 Ready-to-Use Demo Credentials
+- **Admin Access:** `admin@finance.app` / `Password123!` or Google Login (`yashhraool9@gmail.com`)
+- **Member Access:** `alex@finance.app` / `Password123!` or Google Login (`alex.johnson@gmail.com`)
+*(All demo accounts include pre-seeded 90-day transactions, 84-day habit heatmaps, savings goals, and investment assets.)*
+
+---
+
 ## 🌐 Overview
 
 ### 👤 User Capabilities
