@@ -96,7 +96,9 @@ export default function AuthSpotlight({ initialMode = 'login', initialExpanded =
   };
 
   const handleGoogleSignIn = () => {
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    const clientId =
+      import.meta.env.VITE_GOOGLE_CLIENT_ID ||
+      '887933218734-2su6ainaurpgeh1jilr4lt4fplnlrpse.apps.googleusercontent.com';
 
     if (!clientId) {
       toast.error('Google Client ID is missing. Please set VITE_GOOGLE_CLIENT_ID in client/.env');
