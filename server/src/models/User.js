@@ -19,7 +19,9 @@ const userSchema = new mongoose.Schema(
     },
     passwordHash: {
       type: String,
-      required: [true, 'Password is required'],
+      required: function () {
+        return !this.googleId;
+      },
       minlength: 8,
       select: false,
     },
@@ -33,6 +35,34 @@ const userSchema = new mongoose.Schema(
       default: 'USD',
       maxlength: 3,
     },
+    avatar: {
+      type: String,
+      default: '',
+    },
+    picture: {
+      type: String,
+      default: '',
+    },
+    googleId: {
+      type: String,
+      default: '',
+    },
+    tagline: {
+      type: String,
+      default: '',
+    },
+    bio: {
+      type: String,
+      default: '',
+    },
+    savingsRate: {
+      type: Number,
+      default: 20,
+    },
+    monthlySavingsTarget: {
+      type: Number,
+      default: 20,
+    },
     isActive: {
       type: Boolean,
       default: true,
@@ -43,7 +73,7 @@ const userSchema = new mongoose.Schema(
 
 /** Hash password before saving */
 userSchema.pre('save', async function (next) {
-  if (!this.isModified('passwordHash')) return next();
+  if (!this.isModified('passwordHash') || !this.passwordHash) return next();
   this.passwordHash = await bcrypt.hash(this.passwordHash, 12);
   next();
 });

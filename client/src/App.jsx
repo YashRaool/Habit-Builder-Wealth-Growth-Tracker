@@ -16,7 +16,7 @@ import Admin from './pages/Admin';
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
       <AuthProvider>
         <ToastProvider>
           <Routes>
@@ -29,9 +29,11 @@ export default function App() {
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="transactions" element={<Transactions />} />
+              <Route path="tracker" element={<Transactions />} />
               <Route path="habits" element={<Habits />} />
               <Route path="goals" element={<Goals />} />
               <Route path="wealth" element={<Wealth />} />
+              <Route path="analytics" element={<Wealth />} />
               <Route path="admin" element={<AdminRoute><Admin /></AdminRoute>} />
             </Route>
 

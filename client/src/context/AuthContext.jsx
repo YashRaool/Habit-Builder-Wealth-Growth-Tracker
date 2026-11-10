@@ -14,13 +14,39 @@ export function AuthProvider({ children }) {
   });
   const [loading, setLoading] = useState(true);
 
-  // Verify token on mount
+  // Verify token on mount and merge stored profile details
   useEffect(() => {
     const token = localStorage.getItem('fht_token');
     if (token) {
+      if (token.startsWith('demo_token_')) {
+        setLoading(false);
+        return;
+      }
       authAPI.getMe()
-        .then((res) => setUser(res.data.data.user))
-        .catch(() => logout())
+        .then((res) => {
+          try {
+            const stored = localStorage.getItem('fht_user');
+            const storedUser = stored ? JSON.parse(stored) : {};
+            const merged = { ...storedUser, ...res.data.data.user };
+            localStorage.setItem('fht_user', JSON.stringify(merged));
+            setUser(merged);
+          } catch {
+            setUser(res.data.data.user);
+          }
+        })
+        .catch(() => {
+          // If offline or using client session, preserve stored session if present
+          const stored = localStorage.getItem('fht_user');
+          if (stored) {
+            try {
+              setUser(JSON.parse(stored));
+            } catch {
+              logout();
+            }
+          } else {
+            logout();
+          }
+        })
         .finally(() => setLoading(false));
     } else {
       setLoading(false);
@@ -31,6 +57,13 @@ export function AuthProvider({ children }) {
     localStorage.setItem('fht_token', token);
     localStorage.setItem('fht_user', JSON.stringify(userData));
     setUser(userData);
+  };
+
+  const loginWithGoogle = async (googleAuthData) => {
+    const res = await authAPI.googleLogin(googleAuthData);
+    const { token, user: userData } = res.data.data;
+    login(token, userData);
+    return userData;
   };
 
   const logout = () => {
@@ -46,7 +79,17 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, updateUser, isAdmin: user?.role === 'admin' }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        login,
+        loginWithGoogle,
+        logout,
+        updateUser,
+        isAdmin: user?.role === 'admin',
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

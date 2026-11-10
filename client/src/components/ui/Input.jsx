@@ -6,15 +6,21 @@ const Input = forwardRef(function Input({ label, error, className = '', id, ...p
 
   return (
     <div className="flex flex-col gap-1.5">
-      {label && <label htmlFor={inputId} className="text-sm font-medium text-slate-700">{label}</label>}
-      <input 
-        ref={ref} 
+      {label && (
+        <label htmlFor={inputId} className="text-xs font-medium text-slate-700">
+          {label}
+        </label>
+      )}
+      <input
+        ref={ref}
         id={inputId}
         aria-invalid={!!error}
-        className={`input-field ${error ? 'border-red-300 focus:ring-red-500/20 focus:border-red-500' : ''} ${className}`} 
-        {...props} 
+        className={`input-field ${
+          error ? 'border-rose-300 focus:ring-rose-500/20 focus:border-rose-500' : ''
+        } ${className}`}
+        {...props}
       />
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-rose-500">{error}</p>}
     </div>
   );
 });
@@ -26,17 +32,22 @@ export function Select({ label, error, children, className = '', id, ...props })
   const selectId = id || generatedId;
   return (
     <div className="flex flex-col gap-1.5">
-      {label && <label htmlFor={selectId} className="text-sm font-medium text-slate-700">{label}</label>}
+      {label && (
+        <label htmlFor={selectId} className="text-xs font-medium text-slate-700">
+          {label}
+        </label>
+      )}
       <select
         id={selectId}
         aria-invalid={!!error}
-        className={`input-field appearance-none ${error ? 'border-red-300 focus:ring-red-500/20 focus:border-red-500' : ''} ${className}`}
-        style={{ backgroundImage: 'none' }}
+        className={`input-field appearance-none cursor-pointer ${
+          error ? 'border-rose-300 focus:ring-rose-500/20 focus:border-rose-500' : ''
+        } ${className}`}
         {...props}
       >
         {children}
       </select>
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-rose-500">{error}</p>}
     </div>
   );
 }
@@ -46,14 +57,20 @@ export function Textarea({ label, error, className = '', id, ...props }) {
   const textareaId = id || generatedId;
   return (
     <div className="flex flex-col gap-1.5">
-      {label && <label htmlFor={textareaId} className="text-sm font-medium text-slate-700">{label}</label>}
-      <textarea 
+      {label && (
+        <label htmlFor={textareaId} className="text-xs font-medium text-slate-700">
+          {label}
+        </label>
+      )}
+      <textarea
         id={textareaId}
         aria-invalid={!!error}
-        className={`input-field resize-none ${error ? 'border-red-300 focus:ring-red-500/20 focus:border-red-500' : ''} ${className}`} 
-        {...props} 
+        className={`input-field resize-none ${
+          error ? 'border-rose-300 focus:ring-rose-500/20 focus:border-rose-500' : ''
+        } ${className}`}
+        {...props}
       />
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-rose-500">{error}</p>}
     </div>
   );
 }

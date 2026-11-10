@@ -1,4 +1,5 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -37,7 +38,7 @@ const limiterBase = rateLimit({
 });
 const limiterAuth = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 15,
+  max: process.env.NODE_ENV === 'development' ? 500 : 15,
   message: { success: false, message: 'Too many auth attempts, please try again later.' },
 });
 app.use('/api/auth', limiterAuth);

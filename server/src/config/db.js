@@ -40,7 +40,9 @@ const connectDB = async () => {
 
       if (isEmpty) {
         console.log('🌱 Database is empty. Running seed script...');
-        exec('node seed/seed.js', { env: { ...process.env, MONGO_URI: uri } }, (error, stdout, stderr) => {
+        const path = require('path');
+        const seedPath = path.join(__dirname, '../../seed/seed.js');
+        exec(`node "${seedPath}"`, { env: { ...process.env, MONGO_URI: uri }, cwd: path.join(__dirname, '../../') }, (error, stdout, stderr) => {
           if (error) {
             console.error(`❌ Seed error: ${error.message}`);
             return;
