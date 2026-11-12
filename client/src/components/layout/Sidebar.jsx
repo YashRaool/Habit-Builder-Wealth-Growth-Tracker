@@ -1,4 +1,5 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import logoMark from '../../assets/logo-mark.png';
 import {
   LayoutDashboard,
   ArrowLeftRight,
@@ -83,12 +84,14 @@ export default function Sidebar({
             <button
               type="button"
               onClick={onToggle}
-              className="w-10 h-10 rounded-xl bg-indigo-600 hover:bg-slate-100 text-white hover:text-slate-700 font-bold flex items-center justify-center relative group cursor-pointer transition-colors duration-200 shadow-xs"
+              className="w-10 h-10 rounded-xl bg-slate-900 hover:bg-slate-100 border border-slate-800/80 hover:border-slate-300 text-white hover:text-slate-700 font-bold flex items-center justify-center relative group cursor-pointer transition-colors duration-200 shadow-xs p-1"
               aria-label="Expand menu"
             >
-              <span className="text-base font-bold transition-all duration-200 group-hover:scale-0 group-hover:opacity-0 absolute">
-                W
-              </span>
+              <img
+                src={logoMark}
+                alt="WealthHabit Logo"
+                className="w-7 h-7 object-contain transition-all duration-200 group-hover:scale-0 group-hover:opacity-0 absolute"
+              />
               <PanelLeftOpen
                 size={20}
                 className="transition-all duration-200 scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100 absolute text-slate-700"
@@ -105,15 +108,19 @@ export default function Sidebar({
               onClick={onCloseMobile}
               className="flex items-center gap-2.5 min-w-0 group"
             >
-              <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white font-bold flex items-center justify-center shadow-xs shrink-0 transition-transform group-hover:scale-105">
-                W
+              <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800/80 flex items-center justify-center p-1 shadow-xs shrink-0 transition-transform group-hover:scale-105">
+                <img
+                  src={logoMark}
+                  alt="WealthHabit Logo"
+                  className="w-7 h-7 object-contain"
+                />
               </div>
               <div className="truncate">
-                <span className="text-slate-900 font-bold text-base tracking-tight block leading-tight">
-                  WealthHabit
+                <span className="text-[#0F172A] font-extrabold text-base tracking-tight block leading-tight">
+                  Wealth<span className="text-[#4F46E5]">Habit</span>
                 </span>
                 <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">
-                  FinTech SaaS
+                  Growth Loop
                 </span>
               </div>
             </NavLink>

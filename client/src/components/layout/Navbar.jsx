@@ -1,6 +1,7 @@
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { Menu, Flame, UserCog, LogOut } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import logoMark from '../../assets/logo-mark.png';
 
 const ROUTE_META = {
   '/dashboard': { title: 'Dashboard', section: 'Overview' },
@@ -49,8 +50,8 @@ export default function Navbar({
 
   return (
     <header className="h-16 sticky top-0 z-20 bg-white/80 backdrop-blur-md border-b border-slate-200 px-6 flex items-center justify-between">
-      {/* ── Left Side: Mobile Hamburger Trigger + Dynamic Page Title ── */}
-      <div className="flex items-center gap-3 min-w-0">
+      {/* ── Left Side: Mobile Hamburger Trigger + Brand Mark + Dynamic Page Title ── */}
+      <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
         <button
           type="button"
           onClick={onToggleSidebar}
@@ -60,6 +61,20 @@ export default function Navbar({
         >
           <Menu size={20} />
         </button>
+
+        {/* Minimal Mobile Brand Mark */}
+        <Link
+          to="/dashboard"
+          className="md:hidden flex items-center gap-2 shrink-0 group"
+          title="WealthHabit"
+        >
+          <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center p-0.5 shadow-xs shrink-0 transition-transform group-hover:scale-105">
+            <img src={logoMark} alt="WealthHabit" className="w-6 h-6 object-contain" />
+          </div>
+          <span className="text-[#0F172A] font-extrabold text-sm tracking-tight hidden xs:inline">
+            Wealth<span className="text-[#4F46E5]">Habit</span>
+          </span>
+        </Link>
 
         <div className="flex items-center gap-2 min-w-0 text-sm">
           <span className="text-slate-400 font-medium hidden sm:inline truncate">

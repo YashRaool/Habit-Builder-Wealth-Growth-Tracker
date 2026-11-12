@@ -2,6 +2,7 @@ import {
   LayoutDashboard, ArrowLeftRight, Flame, Target, TrendingUp,
   PanelLeftClose, UserCog, LogOut, Plus
 } from 'lucide-react';
+import logoMark from '../../assets/logo-mark.png';
 
 export default function MockDashboardPreview() {
   return (
@@ -14,15 +15,15 @@ export default function MockDashboardPreview() {
         {/* Logo */}
         <div className="h-16 px-5 border-b border-slate-200/80 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="bg-indigo-600 text-white rounded-xl w-9 h-9 flex items-center justify-center font-bold text-base shadow-xs">
-              W
+            <div className="w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center p-1 shadow-xs shrink-0">
+              <img src={logoMark} alt="WealthHabit" className="w-6 h-6 object-contain" />
             </div>
             <div>
               <span className="text-slate-900 font-bold text-base tracking-tight block leading-tight">
-                WealthHabit
+                Wealth<span className="text-[#4F46E5]">Habit</span>
               </span>
               <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">
-                FinTech SaaS
+                Growth Loop
               </span>
             </div>
           </div>
