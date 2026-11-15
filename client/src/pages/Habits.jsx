@@ -3,6 +3,7 @@ import {
   Plus, Flame, Trash2, Pencil, CheckCheck, Circle, TrendingUp, Sparkles, Loader2,
 } from 'lucide-react';
 import { habitsAPI } from '../api/habits';
+import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import Modal from '../components/ui/Modal';
 import Input from '../components/ui/Input';
@@ -176,6 +177,7 @@ function HabitCard({ habit, onCheckIn, checkingIn, onEdit, onDelete }) {
 /* ─── Main Component ──────────────────────────────────────────── */
 export default function Habits() {
   const toast = useToast();
+  const { user } = useAuth();
   const [habits, setHabits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [checkingIn, setCheckingIn] = useState(null);
@@ -199,8 +201,20 @@ export default function Habits() {
   }, [toast]);
 
   useEffect(() => {
+    if (!user) {
+      setHabits([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     fetchHabits();
-  }, [fetchHabits]);
+  }, [fetchHabits, user?._id, user?.email]);
+
+  useEffect(() => {
+    const handleLogout = () => setHabits([]);
+    window.addEventListener('fht:logout', handleLogout);
+    return () => window.removeEventListener('fht:logout', handleLogout);
+  }, []);
 
   /* ── Check-in (toggle) ── */
   const handleCheckIn = async (habit) => {

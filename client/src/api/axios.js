@@ -10,8 +10,11 @@ const isStaticHosting =
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api',
-  timeout: 5000,
-  headers: { 'Content-Type': 'application/json' },
+  timeout: 10000, // 10 s — circuit-breaker: no infinite retry loops
+  headers: {
+    'Content-Type': 'application/json',
+    'X-Requested-With': 'XMLHttpRequest', // CSRF guard signal
+  },
 });
 
 // Attach JWT token to every request and route to offline store if on static hosting

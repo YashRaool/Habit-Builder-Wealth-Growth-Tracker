@@ -6,13 +6,17 @@ node_modules/
 dist/
 */dist/
 
-# Environment secrets
+# Environment secrets — block all .env variants except .example files
 .env
-.env*.local
+.env.*
+!.env.example
+!**/.env.example
 client/.env
-client/.env*.local
+client/.env.*
+!client/.env.example
 server/.env
-server/.env*.local
+server/.env.*
+!server/.env.example
 
 # Logs and OS files
 *.log

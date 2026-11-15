@@ -1,4 +1,5 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import Logo from '../ui/Logo';
 import logoMark from '../../assets/logo-mark.png';
 import {
   LayoutDashboard,
@@ -84,14 +85,16 @@ export default function Sidebar({
             <button
               type="button"
               onClick={onToggle}
-              className="w-10 h-10 rounded-xl bg-slate-900 hover:bg-slate-100 border border-slate-800/80 hover:border-slate-300 text-white hover:text-slate-700 font-bold flex items-center justify-center relative group cursor-pointer transition-colors duration-200 shadow-xs p-1"
+              className="w-10 h-10 aspect-square rounded-xl bg-[#222936] shadow-sm hover:bg-slate-100 border border-slate-800/80 hover:border-slate-300 text-white hover:text-slate-700 font-bold flex-shrink-0 overflow-hidden flex items-center justify-center relative group cursor-pointer transition-colors duration-200 p-1"
               aria-label="Expand menu"
             >
-              <img
-                src={logoMark}
-                alt="WealthHabit Logo"
-                className="w-7 h-7 object-contain transition-all duration-200 group-hover:scale-0 group-hover:opacity-0 absolute"
-              />
+              <div className="w-full h-full aspect-square flex items-center justify-center overflow-hidden transition-all duration-200 group-hover:scale-0 group-hover:opacity-0 absolute p-1">
+                <img
+                  src={logoMark}
+                  alt="WealthHabit Logo"
+                  className="w-full h-full object-contain object-center scale-100"
+                />
+              </div>
               <PanelLeftOpen
                 size={20}
                 className="transition-all duration-200 scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100 absolute text-slate-700"
@@ -108,13 +111,7 @@ export default function Sidebar({
               onClick={onCloseMobile}
               className="flex items-center gap-2.5 min-w-0 group"
             >
-              <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800/80 flex items-center justify-center p-1 shadow-xs shrink-0 transition-transform group-hover:scale-105">
-                <img
-                  src={logoMark}
-                  alt="WealthHabit Logo"
-                  className="w-7 h-7 object-contain"
-                />
-              </div>
+              <Logo size="md" className="transition-transform group-hover:scale-105" />
               <div className="truncate">
                 <span className="text-[#0F172A] font-extrabold text-base tracking-tight block leading-tight">
                   Wealth<span className="text-[#4F46E5]">Habit</span>

@@ -1,6 +1,6 @@
 /**
  * Browser LocalStorage Offline/Static Fallback Store
- * Used when running on static hosts (e.g., GitHub Pages) or when localhost:5000 is unreachable.
+ * Scoped strictly by user email / user ID to enforce multi-account data isolation.
  */
 
 const SEED_USER = {
@@ -160,7 +160,44 @@ const SEED_TRANSACTIONS = [
   { _id: 'tx_12', type: 'expense', category: 'Food & Dining', amount: 480, description: 'Prior month groceries', date: new Date(Date.now() - 35 * 86400000).toISOString().slice(0, 10) },
 ];
 
-function getStore(key, defaultVal) {
+/** Retrieve active user from stored session */
+function getActiveUser(overrideUser) {
+  if (overrideUser) return overrideUser;
+  try {
+    const raw = localStorage.getItem('fht_user');
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return null;
+}
+
+/** Check if the active user is the demo account alex@finance.app */
+function isDemoUser(user) {
+  const u = getActiveUser(user);
+  return Boolean(u?.email && u.email.toLowerCase() === 'alex@finance.app');
+}
+
+/** Build strictly namespaced localStorage key per user */
+function getUserKey(resource, user) {
+  const u = getActiveUser(user);
+  const identifier = (u?.email || u?._id || u?.id || 'guest').toLowerCase();
+  return `wh_data_${identifier}_${resource}`;
+}
+
+/** Retrieve user-namespaced resource store with $0 / empty defaults for non-demo users */
+function getUserData(resource, user) {
+  const u = getActiveUser(user);
+  const key = getUserKey(resource, u);
+  const isDemo = isDemoUser(u);
+
+  // Strictly isolate seed data only to alex@finance.app
+  let defaultVal = [];
+  if (isDemo) {
+    if (resource === 'habits') defaultVal = SEED_HABITS;
+    else if (resource === 'goals') defaultVal = SEED_GOALS;
+    else if (resource === 'transactions') defaultVal = SEED_TRANSACTIONS;
+    else if (resource === 'assets') defaultVal = SEED_ASSETS;
+  }
+
   try {
     const raw = localStorage.getItem(key);
     if (!raw) {
@@ -173,7 +210,9 @@ function getStore(key, defaultVal) {
   }
 }
 
-function setStore(key, val) {
+/** Write user-namespaced resource store */
+function setUserData(resource, val, user) {
+  const key = getUserKey(resource, user);
   try {
     localStorage.setItem(key, JSON.stringify(val));
   } catch (e) {
@@ -190,7 +229,7 @@ function computeSummary(txs) {
     monthsMap[key] = { month: key, income: 0, expense: 0, count: 0 };
   }
 
-  txs.forEach((t) => {
+  (txs || []).forEach((t) => {
     const key = (t.date || '').slice(0, 7);
     if (monthsMap[key]) {
       const amt = Number(t.amount) || 0;
@@ -204,12 +243,13 @@ function computeSummary(txs) {
 }
 
 function computeNetWorth(assets) {
-  const totalValuation = assets.reduce((s, a) => s + (Number(a.valuation) || 0), 0);
-  const totalInvested = assets.reduce((s, a) => s + (Number(a.investedAmount) || 0), 0);
+  const list = assets || [];
+  const totalValuation = list.reduce((s, a) => s + (Number(a.valuation) || 0), 0);
+  const totalInvested = list.reduce((s, a) => s + (Number(a.investedAmount) || 0), 0);
   const totalReturn = totalInvested > 0 ? ((totalValuation - totalInvested) / totalInvested) * 100 : 0;
 
   const byType = {};
-  assets.forEach((a) => {
+  list.forEach((a) => {
     const t = a.assetType || 'Other';
     byType[t] = (byType[t] || 0) + (Number(a.valuation) || 0);
   });
@@ -218,7 +258,7 @@ function computeNetWorth(assets) {
     totalValuation,
     totalInvested,
     totalReturn,
-    assets,
+    assets: list,
     byType,
   };
 }
@@ -233,13 +273,17 @@ export async function handleOfflineRequest(config) {
     body = {};
   }
 
+  const currentUser = getActiveUser();
+
   // 1. Auth routes
   if (url.includes('/auth/me')) {
-    const user = getStore('fht_offline_user', SEED_USER);
-    return { user };
+    if (currentUser) return { user: currentUser };
+    if (isDemoUser()) return { user: SEED_USER };
+    return { user: null };
   }
 
   if (url.includes('/auth/google')) {
+    let gUser = null;
     if (body.token) {
       try {
         const gRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
@@ -247,7 +291,7 @@ export async function handleOfflineRequest(config) {
         });
         if (gRes.ok) {
           const gProfile = await gRes.json();
-          const gUser = {
+          gUser = {
             _id: 'usr_g_' + (gProfile.sub || Date.now()),
             name: gProfile.name || gProfile.given_name || 'Google User',
             email: gProfile.email,
@@ -256,47 +300,58 @@ export async function handleOfflineRequest(config) {
             googleId: gProfile.sub || 'google_auth',
             currency: 'USD',
             role: 'user',
-            bio: 'Wealth builder verified via Google',
-            monthlySavingsTarget: 2500,
-            savingsRate: 25,
+            bio: '',
+            monthlySavingsTarget: 0,
+            savingsRate: 0,
           };
-          setStore('fht_offline_user', gUser);
-          return { token: 'mock_jwt_' + Date.now(), user: gUser };
         }
       } catch (err) {
         console.warn('Direct Google userinfo lookup failed:', err);
       }
     }
-    const fallbackUser = {
-      ...SEED_USER,
-      name: body.name || 'Google User',
-      email: body.email || 'google.user@example.com',
-      googleId: 'google_local_demo',
-    };
-    setStore('fht_offline_user', fallbackUser);
-    return { token: 'mock_jwt_' + Date.now(), user: fallbackUser };
+    if (!gUser) {
+      gUser = {
+        _id: 'usr_g_' + Date.now(),
+        name: body.name || 'Google User',
+        email: body.email || 'google.user@example.com',
+        googleId: 'google_local_demo',
+        currency: 'USD',
+        role: 'user',
+        bio: '',
+        monthlySavingsTarget: 0,
+        savingsRate: 0,
+      };
+    }
+    localStorage.setItem('fht_user', JSON.stringify(gUser));
+    return { token: 'mock_jwt_' + Date.now(), user: gUser };
   }
 
   if (url.includes('/auth/login') || url.includes('/auth/register')) {
-    const existing = getStore('fht_offline_user', SEED_USER);
-    const user = {
-      ...existing,
-      name: body.name || existing.name,
-      email: body.email || existing.email,
-    };
-    setStore('fht_offline_user', user);
+    const isAlex = body.email?.toLowerCase() === 'alex@finance.app';
+    const user = isAlex
+      ? SEED_USER
+      : {
+          _id: 'usr_' + Date.now(),
+          name: body.name || (body.email ? body.email.split('@')[0] : 'User'),
+          email: body.email || 'user@example.com',
+          currency: body.currency || 'USD',
+          role: 'user',
+          monthlySavingsTarget: 0,
+          savingsRate: 0,
+        };
+    localStorage.setItem('fht_user', JSON.stringify(user));
     return { token: 'mock_jwt_' + Date.now(), user };
   }
 
-  if (url.includes('/auth/profile')) {
-    const user = { ...getStore('fht_offline_user', SEED_USER), ...body };
-    setStore('fht_offline_user', user);
+  if (url.includes('/auth/profile') || (url.includes('/auth/me') && method === 'put')) {
+    const user = { ...(currentUser || {}), ...body };
+    localStorage.setItem('fht_user', JSON.stringify(user));
     return { user };
   }
 
   // 2. Habits routes
   if (url.includes('/habits')) {
-    let habits = getStore('fht_offline_habits', SEED_HABITS);
+    let habits = getUserData('habits', currentUser);
 
     if (url.includes('/checkin')) {
       const id = url.split('/habits/')[1]?.split('/')[0];
@@ -318,7 +373,7 @@ export async function handleOfflineRequest(config) {
         }
         return h;
       });
-      setStore('fht_offline_habits', habits);
+      setUserData('habits', habits, currentUser);
       return { habit: habits.find((h) => h._id === id) };
     }
 
@@ -337,21 +392,21 @@ export async function handleOfflineRequest(config) {
         ...body,
       };
       habits.unshift(newHabit);
-      setStore('fht_offline_habits', habits);
+      setUserData('habits', habits, currentUser);
       return { habit: newHabit };
     }
 
     if (method === 'put') {
       const id = url.split('/habits/')[1];
       habits = habits.map((h) => (h._id === id ? { ...h, ...body } : h));
-      setStore('fht_offline_habits', habits);
+      setUserData('habits', habits, currentUser);
       return { habit: habits.find((h) => h._id === id) };
     }
 
     if (method === 'delete') {
       const id = url.split('/habits/')[1];
       habits = habits.filter((h) => h._id !== id);
-      setStore('fht_offline_habits', habits);
+      setUserData('habits', habits, currentUser);
       return {};
     }
 
@@ -360,7 +415,7 @@ export async function handleOfflineRequest(config) {
 
   // 3. Goals routes
   if (url.includes('/goals')) {
-    let goals = getStore('fht_offline_goals', SEED_GOALS);
+    let goals = getUserData('goals', currentUser);
 
     if (url.includes('/contribute')) {
       const id = url.split('/goals/')[1]?.split('/')[0];
@@ -378,7 +433,7 @@ export async function handleOfflineRequest(config) {
         }
         return g;
       });
-      setStore('fht_offline_goals', goals);
+      setUserData('goals', goals, currentUser);
       return { goal: goals.find((g) => g._id === id) };
     }
 
@@ -395,21 +450,21 @@ export async function handleOfflineRequest(config) {
         ...body,
       };
       goals.unshift(newGoal);
-      setStore('fht_offline_goals', goals);
+      setUserData('goals', goals, currentUser);
       return { goal: newGoal };
     }
 
     if (method === 'put') {
       const id = url.split('/goals/')[1];
       goals = goals.map((g) => (g._id === id ? { ...g, ...body } : g));
-      setStore('fht_offline_goals', goals);
+      setUserData('goals', goals, currentUser);
       return { goal: goals.find((g) => g._id === id) };
     }
 
     if (method === 'delete') {
       const id = url.split('/goals/')[1];
       goals = goals.filter((g) => g._id !== id);
-      setStore('fht_offline_goals', goals);
+      setUserData('goals', goals, currentUser);
       return {};
     }
 
@@ -418,7 +473,7 @@ export async function handleOfflineRequest(config) {
 
   // 4. Transactions routes
   if (url.includes('/transactions')) {
-    let txs = getStore('fht_offline_transactions', SEED_TRANSACTIONS);
+    let txs = getUserData('transactions', currentUser);
 
     if (url.includes('/summary')) {
       return { summary: computeSummary(txs) };
@@ -436,21 +491,21 @@ export async function handleOfflineRequest(config) {
         ...body,
       };
       txs.unshift(newTx);
-      setStore('fht_offline_transactions', txs);
+      setUserData('transactions', txs, currentUser);
       return { transaction: newTx };
     }
 
     if (method === 'put') {
       const id = url.split('/transactions/')[1];
       txs = txs.map((t) => (t._id === id ? { ...t, ...body } : t));
-      setStore('fht_offline_transactions', txs);
+      setUserData('transactions', txs, currentUser);
       return { transaction: txs.find((t) => t._id === id) };
     }
 
     if (method === 'delete') {
       const id = url.split('/transactions/')[1];
       txs = txs.filter((t) => t._id !== id);
-      setStore('fht_offline_transactions', txs);
+      setUserData('transactions', txs, currentUser);
       return {};
     }
 
@@ -467,14 +522,14 @@ export async function handleOfflineRequest(config) {
 
   // 5. Wealth routes
   if (url.includes('/wealth')) {
-    let assets = getStore('fht_offline_assets', SEED_ASSETS);
+    let assets = getUserData('assets', currentUser);
 
     if (url.includes('/net-worth')) {
       return computeNetWorth(assets);
     }
 
     if (url.includes('/history')) {
-      const txs = getStore('fht_offline_transactions', SEED_TRANSACTIONS);
+      const txs = getUserData('transactions', currentUser);
       const summary = computeSummary(txs);
       const baseVal = assets.reduce((s, a) => s + (Number(a.valuation) || 0), 0);
       const history = summary.map((s, idx) => ({
@@ -496,21 +551,21 @@ export async function handleOfflineRequest(config) {
         ...body,
       };
       assets.unshift(newAsset);
-      setStore('fht_offline_assets', assets);
+      setUserData('assets', assets, currentUser);
       return { asset: newAsset };
     }
 
     if (method === 'put') {
       const id = url.split('/wealth/assets/')[1];
       assets = assets.map((a) => (a._id === id ? { ...a, ...body } : a));
-      setStore('fht_offline_assets', assets);
+      setUserData('assets', assets, currentUser);
       return { asset: assets.find((a) => a._id === id) };
     }
 
     if (method === 'delete') {
       const id = url.split('/wealth/assets/')[1];
       assets = assets.filter((a) => a._id !== id);
-      setStore('fht_offline_assets', assets);
+      setUserData('assets', assets, currentUser);
       return {};
     }
 
@@ -519,9 +574,9 @@ export async function handleOfflineRequest(config) {
 
   // 6. Admin fallback
   if (url.includes('/admin')) {
-    const habits = getStore('fht_offline_habits', SEED_HABITS);
-    const goals = getStore('fht_offline_goals', SEED_GOALS);
-    const txs = getStore('fht_offline_transactions', SEED_TRANSACTIONS);
+    const habits = getUserData('habits', currentUser);
+    const goals = getUserData('goals', currentUser);
+    const txs = getUserData('transactions', currentUser);
     return {
       metrics: {
         users: 1,
@@ -529,11 +584,10 @@ export async function handleOfflineRequest(config) {
         goals: goals.length,
         transactions: txs.length,
       },
-      users: [getStore('fht_offline_user', SEED_USER)],
+      users: [currentUser || SEED_USER],
       feedback: [],
     };
   }
 
   return {};
 }
-

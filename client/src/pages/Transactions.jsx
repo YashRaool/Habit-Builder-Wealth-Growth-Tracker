@@ -195,8 +195,26 @@ export default function Transactions() {
   }, [filters, toast]);
 
   useEffect(() => {
+    if (!user) {
+      setTransactions([]);
+      setSummary([]);
+      setPagination({ total: 0, pages: 1, page: 1, limit: 15 });
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     fetchData();
-  }, [fetchData]);
+  }, [fetchData, user?._id, user?.email]);
+
+  useEffect(() => {
+    const handleLogout = () => {
+      setTransactions([]);
+      setSummary([]);
+      setPagination({ total: 0, pages: 1, page: 1, limit: 15 });
+    };
+    window.addEventListener('fht:logout', handleLogout);
+    return () => window.removeEventListener('fht:logout', handleLogout);
+  }, []);
 
   /* ── Modal helpers ── */
   const openCreate = (initialType = 'expense') => {

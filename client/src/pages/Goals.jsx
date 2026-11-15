@@ -214,8 +214,20 @@ export default function Goals() {
   }, [toast]);
 
   useEffect(() => {
+    if (!user) {
+      setGoals([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     fetchGoals();
-  }, [fetchGoals]);
+  }, [fetchGoals, user?._id, user?.email]);
+
+  useEffect(() => {
+    const handleLogout = () => setGoals([]);
+    window.addEventListener('fht:logout', handleLogout);
+    return () => window.removeEventListener('fht:logout', handleLogout);
+  }, []);
 
   /* ── Create / Edit ── */
   const openCreate = () => {

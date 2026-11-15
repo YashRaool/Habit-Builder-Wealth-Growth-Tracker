@@ -95,8 +95,30 @@ export default function Wealth() {
   }, [period, toast]);
 
   useEffect(() => {
+    if (!user) {
+      setNetWorth(null);
+      setAssets([]);
+      setHistory([]);
+      setSummary([]);
+      setTransactions([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     fetchData();
-  }, [fetchData]);
+  }, [fetchData, user?._id, user?.email]);
+
+  useEffect(() => {
+    const handleLogout = () => {
+      setNetWorth(null);
+      setAssets([]);
+      setHistory([]);
+      setSummary([]);
+      setTransactions([]);
+    };
+    window.addEventListener('fht:logout', handleLogout);
+    return () => window.removeEventListener('fht:logout', handleLogout);
+  }, []);
 
   /* ── Modal helpers ── */
   const openCreate = () => {

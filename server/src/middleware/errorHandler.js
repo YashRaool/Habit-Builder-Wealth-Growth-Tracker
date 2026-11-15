@@ -1,6 +1,12 @@
 /** Global Express error handler — must have 4 params */
 const errorHandler = (err, req, res, _next) => {
-  console.error(`[ERROR] ${req.method} ${req.originalUrl} —`, err.message);
+  // Log method+path+message only — never log sensitive values or full stack in production
+  const isProd = process.env.NODE_ENV === 'production';
+  if (!isProd) {
+    console.error(`[ERROR] ${req.method} ${req.originalUrl} —`, err.message, err.stack);
+  } else {
+    console.error(`[ERROR] ${req.method} ${req.originalUrl} — ${err.message}`);
+  }
 
   // Mongoose validation error
   if (err.name === 'ValidationError') {
@@ -10,7 +16,7 @@ const errorHandler = (err, req, res, _next) => {
 
   // Mongoose duplicate key
   if (err.code === 11000) {
-    const field = Object.keys(err.keyValue)[0];
+    const field = Object.keys(err.keyValue || {})[0] || 'field';
     return res.status(400).json({ success: false, message: `${field} already exists.` });
   }
 
@@ -30,8 +36,8 @@ const errorHandler = (err, req, res, _next) => {
   const statusCode = err.statusCode || 500;
   res.status(statusCode).json({
     success: false,
-    message: statusCode === 500 ? 'Internal server error' : err.message,
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
+    // In production: generic message for 500s; never expose err.stack or raw DB errors
+    message: statusCode === 500 && isProd ? 'Internal server error' : err.message,
   });
 };
 

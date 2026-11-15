@@ -3,8 +3,10 @@ const {
   getHabits, getHabit, createHabit, updateHabit, deleteHabit, checkIn, getHistory,
 } = require('../controllers/habitController');
 const { protect } = require('../middleware/auth');
+const { validateObjectId } = require('../middleware/security');
 
 router.use(protect);
+router.param('id', validateObjectId);
 router.get('/', getHabits);
 router.post('/', createHabit);
 router.get('/:id', getHabit);

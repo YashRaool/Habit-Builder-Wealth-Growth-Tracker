@@ -4,6 +4,9 @@ import react from '@vitejs/plugin-react';
 export default defineConfig(({ mode }) => ({
   base: mode === 'production' ? '/Habit-Builder-Wealth-Growth-Tracker/' : '/',
   plugins: [react()],
+  build: {
+    sourcemap: false, // never expose source maps in production builds
+  },
   server: {
     port: 5173,
     proxy: {

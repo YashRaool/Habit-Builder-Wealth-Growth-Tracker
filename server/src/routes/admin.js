@@ -2,8 +2,10 @@ const router = require('express').Router();
 const { getMetrics, getUsers, updateUser, deleteUser, getFeedback, updateFeedback, createFeedback } = require('../controllers/adminController');
 const { protect } = require('../middleware/auth');
 const { authorize } = require('../middleware/rbac');
+const { validateObjectId } = require('../middleware/security');
 
 router.use(protect);
+router.param('id', validateObjectId);
 
 // Any authenticated user can submit feedback
 router.post('/feedback', createFeedback);

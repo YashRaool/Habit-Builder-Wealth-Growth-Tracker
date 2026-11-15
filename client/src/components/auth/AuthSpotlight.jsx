@@ -5,6 +5,7 @@ import {
   Loader2, ArrowRight
 } from 'lucide-react';
 import MockDashboardPreview from './MockDashboardPreview';
+import Logo from '../ui/Logo';
 import logoMark from '../../assets/logo-mark.png';
 import { authAPI } from '../../api/auth';
 import { useAuth } from '../../context/AuthContext';
@@ -208,13 +209,7 @@ export default function AuthSpotlight({ initialMode = 'login', initialExpanded =
 
           {/* Brand Header */}
           <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center bg-slate-900 border border-slate-800/90 rounded-2xl w-24 h-16 shadow-lg mb-3 p-2 transition-transform hover:scale-105">
-              <img
-                src={logoMark}
-                alt="WealthHabit Logo"
-                className="w-full h-full object-contain filter drop-shadow-sm"
-              />
-            </div>
+            <Logo size="lg" className="mx-auto mb-3 transition-transform hover:scale-105" />
             <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
               Wealth<span className="text-[#4F46E5]">Habit</span>
             </h1>

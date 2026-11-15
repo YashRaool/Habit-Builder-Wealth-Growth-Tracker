@@ -2,6 +2,7 @@ import {
   LayoutDashboard, ArrowLeftRight, Flame, Target, TrendingUp,
   PanelLeftClose, UserCog, LogOut, Plus
 } from 'lucide-react';
+import Logo from '../ui/Logo';
 import logoMark from '../../assets/logo-mark.png';
 
 export default function MockDashboardPreview() {
@@ -15,9 +16,7 @@ export default function MockDashboardPreview() {
         {/* Logo */}
         <div className="h-16 px-5 border-b border-slate-200/80 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center p-1 shadow-xs shrink-0">
-              <img src={logoMark} alt="WealthHabit" className="w-6 h-6 object-contain" />
-            </div>
+            <Logo size="md" />
             <div>
               <span className="text-slate-900 font-bold text-base tracking-tight block leading-tight">
                 Wealth<span className="text-[#4F46E5]">Habit</span>

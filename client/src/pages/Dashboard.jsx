@@ -71,7 +71,27 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
+    if (!user) {
+      setSummary([]);
+      setHabits([]);
+      setNetWorth(null);
+      setGoals([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     fetchData();
+  }, [user?._id, user?.email]);
+
+  useEffect(() => {
+    const handleLogout = () => {
+      setSummary([]);
+      setHabits([]);
+      setNetWorth(null);
+      setGoals([]);
+    };
+    window.addEventListener('fht:logout', handleLogout);
+    return () => window.removeEventListener('fht:logout', handleLogout);
   }, []);
 
   const handleCheckIn = async (habit) => {

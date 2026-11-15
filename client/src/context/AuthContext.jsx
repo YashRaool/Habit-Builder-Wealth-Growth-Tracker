@@ -70,6 +70,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('fht_token');
     localStorage.removeItem('fht_user');
     setUser(null);
+    window.dispatchEvent(new CustomEvent('fht:logout'));
   };
 
   const updateUser = (updates) => {
