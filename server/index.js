@@ -64,8 +64,8 @@ app.use(csrfGuard);
 const CORS_ALLOWLIST = [
   'http://localhost:5173',
   'https://yashraool.github.io',
-  ...(process.env.CLIENT_URL ? [process.env.CLIENT_URL] : []),
-  ...(process.env.CLIENT_ORIGIN ? [process.env.CLIENT_ORIGIN] : []),
+  ...(process.env.CLIENT_URL ? [process.env.CLIENT_URL.replace(/\/$/, '')] : []),
+  ...(process.env.CLIENT_ORIGIN ? [process.env.CLIENT_ORIGIN.replace(/\/$/, '')] : []),
 ];
 app.use(cors({
   origin: (origin, cb) => {
@@ -74,6 +74,8 @@ app.use(cors({
     cb(new Error('Not allowed by CORS'));
   },
   credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
 }));
 
 // ── Circuit-breaker / quota cap (all traffic) ──────────────────────────────
@@ -105,11 +107,11 @@ if (process.env.NODE_ENV === 'development') {
 
 // ── Health check ────────────────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => {
-  const dbStates = ['disconnected', 'connected', 'connecting', 'disconnecting'];
-  res.json({
+  const mongoose = require('mongoose');
+  res.status(200).json({
     status: 'ok',
+    db: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
     uptime: Math.floor(process.uptime()),
-    dbState: dbStates[require('mongoose').connection.readyState] || 'unknown',
     timestamp: new Date(),
   });
 });
@@ -140,7 +142,7 @@ if (process.env.NODE_ENV === 'production') {
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT} [${process.env.NODE_ENV}]`);
 });
 
