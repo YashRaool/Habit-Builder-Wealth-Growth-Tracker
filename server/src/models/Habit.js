@@ -49,5 +49,6 @@ const habitSchema = new mongoose.Schema(
 );
 
 habitSchema.index({ userId: 1, isActive: 1 });
+habitSchema.index({ userId: 1, createdAt: -1 }); // list ordering at scale
 
 module.exports = mongoose.model('Habit', habitSchema);

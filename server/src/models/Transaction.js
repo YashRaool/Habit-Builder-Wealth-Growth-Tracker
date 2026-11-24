@@ -47,9 +47,10 @@ const transactionSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Compound index for efficient user+date queries
-transactionSchema.index({ userId: 1, date: -1 });
-transactionSchema.index({ userId: 1, type: 1, date: -1 });
+// Compound indexes for efficient queries at scale (1–2 lakh users)
+transactionSchema.index({ userId: 1, date: -1 });           // primary list query
+transactionSchema.index({ userId: 1, type: 1, category: 1 }); // filter by type+category
+transactionSchema.index({ userId: 1, type: 1, date: -1 });  // filter by type, sorted
 
 module.exports = mongoose.model('Transaction', transactionSchema);
 module.exports.INCOME_CATEGORIES = INCOME_CATEGORIES;

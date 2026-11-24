@@ -22,7 +22,10 @@ const connectDB = async () => {
     }
 
     const conn = await mongoose.connect(uri, {
+      maxPoolSize: 50,              // handle 1–2 lakh concurrent users
       serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+      connectTimeoutMS: 10000,
     });
     console.log(`✅ MongoDB connected: ${conn.connection.host}`);
 

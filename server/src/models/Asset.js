@@ -67,5 +67,6 @@ assetSchema.virtual('returnPct').get(function () {
 
 assetSchema.set('toJSON', { virtuals: true });
 assetSchema.index({ userId: 1, assetType: 1 });
+assetSchema.index({ userId: 1, createdAt: -1 }); // list ordering at scale
 
 module.exports = mongoose.model('Asset', assetSchema);

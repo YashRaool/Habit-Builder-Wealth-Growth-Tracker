@@ -22,8 +22,10 @@ const getTransactions = asyncHandler(async (req, res) => {
   }
 
   const skip = (Number(page) - 1) * Number(limit);
+  // Hard cap: never fetch more than 100 rows — protects RAM at scale
+  const safeLimit = Math.min(parseInt(limit) || 50, 100);
   const [transactions, total] = await Promise.all([
-    Transaction.find(filter).sort(sort).skip(skip).limit(Number(limit)),
+    Transaction.find(filter).sort(sort).skip(skip).limit(safeLimit).lean(),
     Transaction.countDocuments(filter),
   ]);
 
@@ -66,7 +68,7 @@ const getSummary = asyncHandler(async (req, res) => {
 
 /** GET /api/transactions/:id */
 const getTransaction = asyncHandler(async (req, res) => {
-  const tx = await Transaction.findOne({ _id: req.params.id, userId: req.user._id });
+  const tx = await Transaction.findOne({ _id: req.params.id, userId: req.user._id }).lean();
   if (!tx) return sendNotFound(res, 'Transaction not found.');
   sendSuccess(res, { transaction: tx });
 });

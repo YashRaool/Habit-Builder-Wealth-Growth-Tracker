@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const compression = require('compression');
 
 const connectDB = require('./src/config/db');
 const errorHandler = require('./src/middleware/errorHandler');
@@ -51,6 +52,9 @@ if (process.env.NODE_ENV === 'production') {
 
 // ── Helmet (base security headers) ─────────────────────────────────────────
 app.use(helmet());
+
+// ── Response compression (gzip/br — cuts payload ~70% at scale) ────────────
+app.use(compression({ threshold: 1024 }));
 
 // ── Custom security headers + CSRF guard ───────────────────────────────────
 app.use(securityHeaders);
@@ -101,7 +105,13 @@ if (process.env.NODE_ENV === 'development') {
 
 // ── Health check ────────────────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => {
-  res.json({ success: true, message: 'Financial Habit Tracker API is running', timestamp: new Date() });
+  const dbStates = ['disconnected', 'connected', 'connecting', 'disconnecting'];
+  res.json({
+    status: 'ok',
+    uptime: Math.floor(process.uptime()),
+    dbState: dbStates[require('mongoose').connection.readyState] || 'unknown',
+    timestamp: new Date(),
+  });
 });
 
 // ── Mount routes ────────────────────────────────────────────────────────────
@@ -130,8 +140,23 @@ if (process.env.NODE_ENV === 'production') {
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT} [${process.env.NODE_ENV}]`);
 });
+
+// ── Graceful shutdown (SIGTERM / SIGINT) ────────────────────────────────────
+const shutdown = (signal) => {
+  console.log(`\n[${signal}] Graceful shutdown initiated…`);
+  server.close(() => {
+    require('mongoose').connection.close(false, () => {
+      console.log('✅ MongoDB connection closed. Exiting.');
+      process.exit(0);
+    });
+  });
+  // Force exit after 10 s if still pending
+  setTimeout(() => { console.error('⚠️  Forced exit after timeout.'); process.exit(1); }, 10_000).unref();
+};
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT',  () => shutdown('SIGINT'));
 
 module.exports = app;

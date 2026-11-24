@@ -4,7 +4,7 @@ const { sendSuccess, sendCreated, sendBadRequest, sendNotFound } = require('../u
 
 /** GET /api/wealth/assets */
 const getAssets = asyncHandler(async (req, res) => {
-  const assets = await Asset.find({ userId: req.user._id }).sort('-valuation');
+  const assets = await Asset.find({ userId: req.user._id }).sort('-valuation').lean();
   sendSuccess(res, { assets });
 });
 

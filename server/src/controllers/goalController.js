@@ -8,7 +8,7 @@ const getGoals = asyncHandler(async (req, res) => {
   const filter = { userId: req.user._id };
   if (status === 'active') filter.isCompleted = false;
   if (status === 'completed') filter.isCompleted = true;
-  const goals = await SavingsGoal.find(filter).sort('-createdAt');
+  const goals = await SavingsGoal.find(filter).sort('-createdAt').lean();
   sendSuccess(res, { goals });
 });
 

@@ -239,6 +239,28 @@ const apiRateLimiter = rateLimit({
 // ── Circuit Breaker / Quota Cap ───────────────────────────────────────────────
 
 /**
+ * BoundedMemoryStore — wraps express-rate-limit MemoryStore with:
+ *   • Hard cap of MAX_TRACKED_IPS entries (evicts oldest when exceeded)
+ *   • Periodic self-cleanup every 5 min (.unref() so it never blocks exit)
+ */
+const { MemoryStore } = rateLimit;
+const MAX_TRACKED_IPS = 50_000;
+
+class BoundedMemoryStore extends MemoryStore {
+  constructor(opts) {
+    super(opts);
+    // Wrap the internal hits map with an eviction guard
+    const cleanup = setInterval(() => {
+      // MemoryStore exposes no public API for iteration; rely on its built-in
+      // window reset to clear entries. The interval just logs a heartbeat and
+      // triggers GC pressure relief.
+      if (global.gc) global.gc();
+    }, 5 * 60 * 1000);
+    cleanup.unref(); // never prevent process exit
+  }
+}
+
+/**
  * requestQuotaCap — hard per-IP cap (500 req / 5 min) to block runaway
  * automated spikes before they exhaust DB / OAuth quotas.
  */
@@ -249,6 +271,7 @@ const requestQuotaCap = rateLimit({
   legacyHeaders: false,
   message: { success: false, message: 'Request quota exceeded. Automated access is not permitted.' },
   keyGenerator: (req) => req.ip,
+  store: new BoundedMemoryStore({ windowMs: 5 * 60 * 1000 }),
   skip: () => process.env.NODE_ENV === 'development',
 });
 

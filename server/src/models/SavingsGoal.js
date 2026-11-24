@@ -59,6 +59,7 @@ savingsGoalSchema.pre('save', function (next) {
   next();
 });
 
-savingsGoalSchema.index({ userId: 1, isCompleted: 1 });
+savingsGoalSchema.index({ userId: 1, isCompleted: 1 }); // filter by status
+savingsGoalSchema.index({ userId: 1, createdAt: -1 });   // list ordering at scale
 
 module.exports = mongoose.model('SavingsGoal', savingsGoalSchema);
